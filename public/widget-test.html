@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Widget CERYDRA</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 80px auto; padding: 0 24px; color: #333; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p  { color: #666; line-height: 1.6; }
+    .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; margin-top: 32px; }
+    code { background: #1a1a2e; color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Site exemple — Restaurant XYZ</h1>
+  <p>Ceci est un site HTML quelconque. Le widget CERYDRA est injecté via une seule ligne de script.</p>
+
+  <div class="box">
+    <p>Le bouton <code>Réserver</code> est visible en bas à droite →</p>
+    <p style="margin-top:8px;font-size:13px;color:#9ca3af;">
+      Remplacez <code>le-comptoir</code> par le slug de votre restaurant.
+    </p>
+  </div>
+
+  <!-- ⬇️ Remplacez VOTRE-SLUG par le slug de votre restaurant (ex: le-comptoir) -->
+  <script src="/widget.js" data-resto="le-comptoir"></script>
+</body>
+</html>
