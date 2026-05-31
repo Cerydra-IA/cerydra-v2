@@ -17,6 +17,9 @@ dist-ssr
 .env.local
 .env.production
 
+# Widget généré au build (contient les clés Supabase)
+public/widget.js
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
