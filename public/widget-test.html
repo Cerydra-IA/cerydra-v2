@@ -23,7 +23,18 @@
     </p>
   </div>
 
-  <!-- ⬇️ Remplacez VOTRE-SLUG par le slug de votre restaurant (ex: le-comptoir) -->
+  <div class="box" style="margin-top:16px;">
+    <p style="margin-bottom:16px;font-size:13px;color:#6b7280;">Test widget annulation :</p>
+    <button
+      data-cerydra-annuler
+      style="background:#1a1a2e;color:#fff;border:none;padding:12px 22px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">
+      Annuler ma réservation
+    </button>
+  </div>
+
+  <!-- Widget réservation (bouton flottant bas droite) -->
   <script src="/widget.js" data-resto="le-comptoir"></script>
+  <!-- Widget annulation (popup déclenché par data-cerydra-annuler) -->
+  <script src="/widget-annulation.js" data-resto="le-comptoir"></script>
 </body>
 </html>
