@@ -1,16 +1,5 @@
-/**
- * Génère public/widget.js — aucune clé Supabase dedans.
- * Le widget appelle /api/widget (Netlify Function) qui proxy Supabase côté serveur.
- */
-import { writeFileSync, mkdirSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const root = resolve(__dirname, '..')
-
-const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
-   Usage: <script src="https://app.cerydra.fr/widget.js" data-resto="mon-slug"><\/script> */
+/* CERYDRA Widget — aucune clé sensible dans ce fichier.
+   Usage: <script src="https://app.cerydra.fr/widget.js" data-resto="mon-slug"></script> */
 ;(function(){
   var el=document.currentScript||document.querySelector('script[data-resto]');
   var slug=el&&el.getAttribute('data-resto');
@@ -18,7 +7,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
 
   // Détecte l'origine du script pour appeler la bonne API
   var scriptSrc=el&&el.src||'';
-  var API_BASE=scriptSrc?scriptSrc.replace(/\\/widget\\.js.*/,''):window.location.origin;
+  var API_BASE=scriptSrc?scriptSrc.replace(/\/widget\.js.*/,''):window.location.origin;
 
   function apiGet(s){
     return fetch(API_BASE+'/api/widget?slug='+encodeURIComponent(s)).then(function(r){return r.json();});
@@ -40,7 +29,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
   }
   function minDate(n){var d=new Date();d.setHours(d.getHours()+(n||2));return d.toISOString().split('T')[0];}
 
-  var CSS=\`
+  var CSS=`
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     #crd-btn{position:fixed;bottom:28px;right:28px;z-index:2147483646;background:#1a1a2e;color:#fff;border:none;padding:14px 22px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 24px rgba(26,26,46,.4);transition:transform .15s,box-shadow .15s;font-family:'Inter',system-ui,sans-serif;letter-spacing:-.01em;}
     #crd-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(26,26,46,.5);}
@@ -85,7 +74,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
     .rr{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-family:'Inter',system-ui,sans-serif;}
     .rr span:first-child{color:#9ca3af;}
     .rr span:last-child{font-weight:500;color:#1a1a2e;}
-  \`;
+  `;
 
   function mkBtn(){
     return '<button id="crd-btn" aria-label="Reserver une table">'
@@ -225,8 +214,4 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
   }
 
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
-})();`
-
-mkdirSync(resolve(root, 'public'), { recursive: true })
-writeFileSync(resolve(root, 'public', 'widget.js'), src, 'utf8')
-console.log('[widget] public/widget.js genere (sans cles Supabase)')
+})();
