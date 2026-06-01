@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Reservations from './pages/Reservations'
 import RestoPublic from './pages/RestoPublic'
 import Annuler from './pages/Annuler'
+import Admin from './pages/Admin'
 import './index.css'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/resto/:slug" element={<RestoPublic />} />
           <Route path="/annuler/:token" element={<Annuler />} />
           <Route path="*" element={<Navigate to="/" replace />} />
