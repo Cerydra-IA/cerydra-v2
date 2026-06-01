@@ -32,19 +32,17 @@ export default function Admin() {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-    const [{ data: restos, error: e1 }, { data: allReservations, error: e2 }, { data: recentRes, error: e3 }] = await Promise.all([
-      supabase.from('restaurants').select('id, name, slug, created_at, user_id'),
-      supabase.from('reservations').select('id, restaurant_id, created_at').gte('created_at', monthStart),
-      supabase
-        .from('reservations')
-        .select('id, prenom, nom, nb_personnes, date, created_at, restaurant_id, restaurants(name)')
-        .order('created_at', { ascending: false })
-        .limit(10),
-    ])
-
-    console.log('[Admin] restaurants:', restos, 'error:', e1)
-    console.log('[Admin] reservations month:', allReservations, 'error:', e2)
-    console.log('[Admin] recent:', recentRes, 'error:', e3)
+    const [{ data: restos }, { data: allReservations }, { data: recentRes }, { data: allResTotal }] =
+      await Promise.all([
+        supabase.from('restaurants').select('id, name, slug, created_at, user_id'),
+        supabase.from('reservations').select('id, restaurant_id, created_at').gte('created_at', monthStart),
+        supabase
+          .from('reservations')
+          .select('id, prenom, nom, nb_personnes, date, created_at, restaurant_id')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase.from('reservations').select('id, restaurant_id'),
+      ])
 
     const reservationCountById = {}
     const activeIds = new Set()
@@ -53,14 +51,14 @@ export default function Admin() {
       activeIds.add(r.restaurant_id)
     }
 
-    const { data: allResTotal } = await supabase
-      .from('reservations')
-      .select('id, restaurant_id')
-
     const totalCountById = {}
     for (const r of allResTotal ?? []) {
       totalCountById[r.restaurant_id] = (totalCountById[r.restaurant_id] ?? 0) + 1
     }
+
+    // Build a name lookup map from restos to avoid a join query
+    const restoNameById = {}
+    for (const r of restos ?? []) restoNameById[r.id] = r.name
 
     const enriched = (restos ?? []).map((resto) => ({
       ...resto,
@@ -68,8 +66,13 @@ export default function Admin() {
       active: activeIds.has(resto.id),
     }))
 
+    const recentWithName = (recentRes ?? []).map((r) => ({
+      ...r,
+      restaurantName: restoNameById[r.restaurant_id] ?? '—',
+    }))
+
     setRestaurants(enriched)
-    setRecent(recentRes ?? [])
+    setRecent(recentWithName)
     setStats({
       total: enriched.length,
       active: activeIds.size,
@@ -200,7 +203,7 @@ export default function Admin() {
                       <td className="px-6 py-3 font-medium text-[#1a1a2e]">
                         {[r.prenom, r.nom].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td className="px-6 py-3 text-gray-500">{r.restaurants?.name ?? '—'}</td>
+                      <td className="px-6 py-3 text-gray-500">{r.restaurantName}</td>
                       <td className="px-6 py-3 text-gray-500">
                         {r.date
                           ? new Date(r.date).toLocaleDateString('fr-FR')
