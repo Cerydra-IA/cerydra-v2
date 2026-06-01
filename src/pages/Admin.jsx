@@ -32,7 +32,7 @@ export default function Admin() {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-    const [{ data: restos }, { data: allReservations }, { data: recentRes }] = await Promise.all([
+    const [{ data: restos, error: e1 }, { data: allReservations, error: e2 }, { data: recentRes, error: e3 }] = await Promise.all([
       supabase.from('restaurants').select('id, name, slug, created_at, user_id'),
       supabase.from('reservations').select('id, restaurant_id, created_at').gte('created_at', monthStart),
       supabase
@@ -41,6 +41,10 @@ export default function Admin() {
         .order('created_at', { ascending: false })
         .limit(10),
     ])
+
+    console.log('[Admin] restaurants:', restos, 'error:', e1)
+    console.log('[Admin] reservations month:', allReservations, 'error:', e2)
+    console.log('[Admin] recent:', recentRes, 'error:', e3)
 
     const reservationCountById = {}
     const activeIds = new Set()
