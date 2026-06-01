@@ -34,7 +34,7 @@ export default function Admin() {
 
     const [{ data: restos }, { data: allReservations }, { data: recentRes }, { data: allResTotal }] =
       await Promise.all([
-        supabase.from('restaurants').select('id, name, slug, created_at, user_id'),
+        supabase.from('restaurants').select('id, nom, slug, created_at, user_id'),
         supabase.from('reservations').select('id, restaurant_id, created_at').gte('created_at', monthStart),
         supabase
           .from('reservations')
@@ -58,7 +58,7 @@ export default function Admin() {
 
     // Build a name lookup map from restos to avoid a join query
     const restoNameById = {}
-    for (const r of restos ?? []) restoNameById[r.id] = r.name
+    for (const r of restos ?? []) restoNameById[r.id] = r.nom
 
     const enriched = (restos ?? []).map((resto) => ({
       ...resto,
@@ -134,7 +134,7 @@ export default function Admin() {
                 <tbody>
                   {restaurants.map((r) => (
                     <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-6 py-3 font-medium text-[#1a1a2e]">{r.name}</td>
+                      <td className="px-6 py-3 font-medium text-[#1a1a2e]">{r.nom}</td>
                       <td className="px-6 py-3 text-gray-500">{r.slug}</td>
                       <td className="px-6 py-3 text-gray-500">
                         {new Date(r.created_at).toLocaleDateString('fr-FR')}
