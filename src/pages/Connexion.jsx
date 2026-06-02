@@ -38,7 +38,7 @@ export default function Connexion() {
     setResetError('')
     setResetLoading(true)
     const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/connexion`,
+      redirectTo: 'https://app.cerydra.fr/reset-password',
     })
     setResetLoading(false)
     if (err) {

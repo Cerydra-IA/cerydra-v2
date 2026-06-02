@@ -9,6 +9,7 @@ import Reservations from './pages/Reservations'
 import RestoPublic from './pages/RestoPublic'
 import Annuler from './pages/Annuler'
 import Admin from './pages/Admin'
+import ResetPassword from './pages/ResetPassword'
 import './index.css'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
             }
           />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/resto/:slug" element={<RestoPublic />} />
           <Route path="/annuler/:token" element={<Annuler />} />
           <Route path="*" element={<Navigate to="/" replace />} />
