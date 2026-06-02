@@ -43,6 +43,18 @@ export default function Navbar() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs text-gray-400">{user?.email}</span>
+          {user?.email === 'contact@cerydra.fr' && (
+            <Link
+              to="/admin"
+              className={`text-xs font-medium transition-colors ${
+                location.pathname === '/admin'
+                  ? 'text-[#1a1a2e]'
+                  : 'text-gray-400 hover:text-[#1a1a2e]'
+              }`}
+            >
+              Admin
+            </Link>
+          )}
           <button
             onClick={handleSignOut}
             className="text-xs text-gray-400 hover:text-[#1a1a2e] transition-colors"
