@@ -212,8 +212,8 @@ export default function RestoPublic() {
 
     if (err) {
       // Le trigger PostgreSQL renvoie 'doublon_creneau' si le créneau est déjà confirmé
-      if (err.message?.includes('doublon_creneau') || err.code === 'P0001') {
-        setError('Ce créneau est déjà réservé, veuillez choisir un autre horaire.')
+      if (err.message?.includes('creneau_complet')) {
+        setError('Ce créneau est complet. Veuillez choisir un autre horaire.')
       } else {
         console.error(err)
         setError('Une erreur est survenue. Veuillez réessayer.')
