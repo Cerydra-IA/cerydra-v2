@@ -195,6 +195,23 @@ export default function RestoPublic() {
     if (!form.heure) { setError('Veuillez sélectionner un horaire.'); return }
 
     setSubmitting(true)
+
+    // Vérification anti-doublon
+    const { data: doublon } = await supabase
+      .from('reservations')
+      .select('id')
+      .eq('restaurant_id', resto.id)
+      .eq('date', form.date)
+      .eq('heure', form.heure)
+      .eq('statut', 'confirmée')
+      .maybeSingle()
+
+    if (doublon) {
+      setError('Ce créneau est déjà réservé, veuillez choisir un autre horaire.')
+      setSubmitting(false)
+      return
+    }
+
     const { error: err } = await supabase.from('reservations').insert({
       restaurant_id: resto.id,
       prenom: form.prenom,
