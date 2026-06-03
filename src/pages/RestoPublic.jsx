@@ -196,22 +196,6 @@ export default function RestoPublic() {
 
     setSubmitting(true)
 
-    // Vérification anti-doublon
-    const { data: doublon } = await supabase
-      .from('reservations')
-      .select('id')
-      .eq('restaurant_id', resto.id)
-      .eq('date', form.date)
-      .eq('heure', form.heure)
-      .eq('statut', 'confirmée')
-      .maybeSingle()
-
-    if (doublon) {
-      setError('Ce créneau est déjà réservé, veuillez choisir un autre horaire.')
-      setSubmitting(false)
-      return
-    }
-
     const { error: err } = await supabase.from('reservations').insert({
       restaurant_id: resto.id,
       prenom: form.prenom,
@@ -227,8 +211,13 @@ export default function RestoPublic() {
     setSubmitting(false)
 
     if (err) {
-      console.error(err)
-      setError('Une erreur est survenue. Veuillez réessayer.')
+      // Le trigger PostgreSQL renvoie 'doublon_creneau' si le créneau est déjà confirmé
+      if (err.message?.includes('doublon_creneau') || err.code === 'P0001') {
+        setError('Ce créneau est déjà réservé, veuillez choisir un autre horaire.')
+      } else {
+        console.error(err)
+        setError('Une erreur est survenue. Veuillez réessayer.')
+      }
     } else {
       setConfirmed(true)
     }
