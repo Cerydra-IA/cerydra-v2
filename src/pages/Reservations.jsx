@@ -85,6 +85,14 @@ export default function Reservations() {
     setUpdatingId(null)
   }
 
+  const deleteReservation = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) return
+    const { error } = await supabase.from('reservations').delete().eq('id', id)
+    if (!error) {
+      setReservations((r) => r.filter((res) => res.id !== id))
+    }
+  }
+
   const aujourd_hui = new Date().toISOString().split('T')[0]
 
   const filtered = reservations.filter((r) => {
@@ -237,6 +245,12 @@ export default function Reservations() {
                       Annuler
                     </button>
                   )}
+                  <button
+                    onClick={() => deleteReservation(r.id)}
+                    className="text-xs text-gray-300 hover:text-red-500 transition-colors mt-0.5"
+                  >
+                    Supprimer
+                  </button>
                 </div>
               </div>
             ))}
