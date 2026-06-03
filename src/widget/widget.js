@@ -40,15 +40,7 @@
     if (!res.ok) {
       const text = await res.text()
       let errMsg = text
-      try {
-        const outer = JSON.parse(text)
-        // Supabase peut renvoyer { error: '{message:...}' } (double encodage)
-        if (outer.error) {
-          try { errMsg = JSON.parse(outer.error).message || outer.error } catch (_) { errMsg = outer.error }
-        } else {
-          errMsg = outer.message || text
-        }
-      } catch (_) {}
+      try { errMsg = JSON.parse(text).error || text } catch (_) {}
       throw new Error(errMsg)
     }
     return true

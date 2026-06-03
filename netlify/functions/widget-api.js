@@ -35,7 +35,12 @@ async function sbPost(table, body) {
     },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) {
+    const text = await res.text()
+    let errCode = text
+    try { errCode = JSON.parse(text).message || text } catch (_) {}
+    throw new Error(errCode)
+  }
   return true
 }
 
@@ -79,8 +84,12 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Méthode non supportée' }), { status: 405, headers })
 
   } catch (err) {
+    const msg = err.message || ''
+    if (msg === 'doublon_email' || msg === 'creneau_complet') {
+      return new Response(JSON.stringify({ error: msg }), { status: 422, headers })
+    }
     console.error('[widget-api]', err)
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers })
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers })
   }
 }
 
