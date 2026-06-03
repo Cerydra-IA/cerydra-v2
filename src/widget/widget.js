@@ -507,9 +507,16 @@
           })
           formArea.innerHTML = buildConfirm(resto, f)
         } catch (err) {
-          console.error(err)
+          const msg = err?.message || ''
           alert.className = 'crd-alert err'
-          alert.textContent = 'Une erreur est survenue. Veuillez réessayer.'
+          if (msg.includes('doublon_email')) {
+            alert.textContent = 'Vous avez déjà une réservation pour ce créneau.'
+          } else if (msg.includes('creneau_complet')) {
+            alert.textContent = 'Ce créneau est complet. Veuillez choisir un autre horaire.'
+          } else {
+            console.error(err)
+            alert.textContent = 'Une erreur est survenue. Veuillez réessayer.'
+          }
           alert.style.display = 'block'
           submitBtn.disabled = false
           submitBtn.textContent = 'Confirmer la réservation'
