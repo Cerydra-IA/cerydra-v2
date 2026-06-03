@@ -43,6 +43,10 @@ export default function Accueil() {
           Système de réservation intelligent pour restaurants
         </div>
 
+        <div className="inline-flex items-center gap-1.5 border border-[#1a1a2e]/10 text-[#1a1a2e]/60 text-xs font-medium px-3.5 py-1.5 rounded-full mb-4">
+          Vos clients vous appartiennent
+        </div>
+
         <h1 className="text-5xl md:text-6xl font-bold text-[#1a1a2e] leading-tight mb-6 tracking-tight">
           Vos réservations,
           <br />
