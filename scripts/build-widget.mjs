@@ -26,7 +26,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
   function apiPost(s,body){
     return fetch(API_BASE+'/api/widget?slug='+encodeURIComponent(s),{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-    }).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});return true;});
+    }).then(function(r){if(!r.ok)return r.text().then(function(t){var m=t;try{m=JSON.parse(t).error||t;}catch(_){}throw new Error(m);});return true;});
   }
 
   var JOURS={0:'dimanche',1:'lundi',2:'mardi',3:'mercredi',4:'jeudi',5:'vendredi',6:'samedi'};
@@ -158,7 +158,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
       sb.disabled=true;sb.textContent='Envoi...';
       apiPost(slug,{prenom:f.prenom,nom:f.nom,email:f.email,telephone:f.telephone,date:f.date,heure:f.heure,nb_personnes:Number(f.nb_personnes),message:f.message||null})
         .then(function(){sh.getElementById('crd-fa').innerHTML=mkConfirm(resto,f);})
-        .catch(function(err){console.error('[CERYDRA]',err);al.className='al ae';al.textContent='Erreur. Veuillez reessayer.';al.style.display='block';sb.disabled=false;sb.textContent='Confirmer la reservation';});
+        .catch(function(err){var m=err&&err.message||'';al.className='al ae';if(m==='doublon_email'){al.textContent='Vous avez deja une reservation pour ce creneau.';}else if(m==='creneau_complet'){al.textContent='Ce creneau est complet. Veuillez choisir un autre horaire.';}else{console.error('[CERYDRA]',err);al.textContent='Erreur. Veuillez reessayer.';}al.style.display='block';sb.disabled=false;sb.textContent='Confirmer la reservation';});
     });
   }
 
