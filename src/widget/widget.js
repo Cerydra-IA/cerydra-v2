@@ -512,6 +512,8 @@
           })
           formArea.innerHTML = buildConfirm(resto, f)
         } catch (err) {
+          console.error('[CERYDRA DEBUG] err:', err)
+          console.error('[CERYDRA DEBUG] err.message:', err?.message)
           const msg = err?.message || ''
           alert.className = 'crd-alert err'
           if (msg.includes('doublon_email')) {
