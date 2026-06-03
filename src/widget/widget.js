@@ -37,7 +37,12 @@
       },
       body: JSON.stringify(body),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) {
+      const text = await res.text()
+      let errMsg = text
+      try { errMsg = JSON.parse(text).message || text } catch (_) {}
+      throw new Error(errMsg)
+    }
     return true
   }
 
