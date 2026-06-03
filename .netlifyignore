@@ -1,0 +1,3 @@
+# Ces dossiers ne sont pas nécessaires au build Netlify
+supabase/
+scripts/
