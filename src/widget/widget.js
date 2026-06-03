@@ -40,7 +40,15 @@
     if (!res.ok) {
       const text = await res.text()
       let errMsg = text
-      try { errMsg = JSON.parse(text).message || text } catch (_) {}
+      try {
+        const outer = JSON.parse(text)
+        // Supabase peut renvoyer { error: '{message:...}' } (double encodage)
+        if (outer.error) {
+          try { errMsg = JSON.parse(outer.error).message || outer.error } catch (_) { errMsg = outer.error }
+        } else {
+          errMsg = outer.message || text
+        }
+      } catch (_) {}
       throw new Error(errMsg)
     }
     return true
@@ -512,8 +520,6 @@
           })
           formArea.innerHTML = buildConfirm(resto, f)
         } catch (err) {
-          console.error('[CERYDRA DEBUG] err:', err)
-          console.error('[CERYDRA DEBUG] err.message:', err?.message)
           const msg = err?.message || ''
           alert.className = 'crd-alert err'
           if (msg.includes('doublon_email')) {
