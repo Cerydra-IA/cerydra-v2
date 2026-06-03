@@ -247,7 +247,7 @@ export default function Reservations() {
                   )}
                   <button
                     onClick={() => deleteReservation(r.id)}
-                    className="text-xs text-gray-300 hover:text-red-500 transition-colors mt-0.5"
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5 underline-offset-2 hover:underline"
                   >
                     Supprimer
                   </button>
