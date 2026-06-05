@@ -9,5 +9,13 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Formulaire fantôme pour Netlify Forms (détection au build) -->
+    <form name="demande-acces" netlify data-netlify="true" hidden>
+      <input type="text" name="restaurant" />
+      <input type="text" name="nom" />
+      <input type="email" name="email" />
+      <input type="tel" name="telephone" />
+    </form>
   </body>
 </html>
