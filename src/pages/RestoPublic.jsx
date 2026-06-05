@@ -272,34 +272,35 @@ export default function RestoPublic() {
 
       <div className={isWidget ? 'p-4' : 'flex-1 max-w-lg mx-auto w-full px-6 py-10'}>
         {/* Infos restaurant — masquées en mode widget */}
-        {!isWidget && <div className="mb-8">
-          <h1 className="text-2xl font-bold text-[#1a1a2e] mb-1">{resto.nom}</h1>
-          {resto.description && (
-            <p className="text-gray-500 text-sm leading-relaxed">{resto.description}</p>
-          )}
-          {(resto.adresse || resto.telephone) && (
-            <div className="flex flex-wrap gap-4 mt-3">
-              {resto.adresse && (
-                <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {resto.adresse}
-                </span>
-              )}
-              {resto.telephone && (
-                <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z" />
-                  </svg>
-                  {resto.telephone}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        </div>}
+        {!isWidget && (
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-[#1a1a2e] mb-1">{resto.nom}</h1>
+            {resto.description && (
+              <p className="text-gray-500 text-sm leading-relaxed">{resto.description}</p>
+            )}
+            {(resto.adresse || resto.telephone) && (
+              <div className="flex flex-wrap gap-4 mt-3">
+                {resto.adresse && (
+                  <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {resto.adresse}
+                  </span>
+                )}
+                {resto.telephone && (
+                  <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 7V5z" />
+                    </svg>
+                    {resto.telephone}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Formulaire */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
