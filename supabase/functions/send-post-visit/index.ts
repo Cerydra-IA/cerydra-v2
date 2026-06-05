@@ -6,48 +6,67 @@ const MAKE_WEBHOOK_URL = Deno.env.get('MAKE_POST_VISIT_WEBHOOK_URL')!
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-Deno.serve(async (req) => {
+Deno.serve(async (_req) => {
   try {
     const now      = new Date()
-    // FIX #2 : fenêtre large sur la date, filtre précis côté JS sur datetime
-    // Cherche toutes les réservations passées depuis plus de 24h (jusqu'à 48h pour rattraper)
     const before24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const before48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
 
     const before24hStr = before24h.toISOString().split('T')[0]
     const before48hStr = before48h.toISOString().split('T')[0]
 
+    console.log('[send-post-visit] now:', now.toISOString(), '| fenêtre:', before48hStr, '->', before24hStr)
+
+    // Requête sans join pour éviter les erreurs PostgREST
     const { data: reservations, error } = await supabase
       .from('reservations')
-      .select('id, prenom, nom, email, date, heure, nb_personnes, restaurants(nom, slug)')
+      .select('id, prenom, nom, email, date, heure, nb_personnes, restaurant_id')
       .eq('post_visit_sent', false)
       .eq('statut', 'confirmée')
       .gte('date', before48hStr)
       .lte('date', before24hStr)
 
-    if (error) throw error
+    if (error) throw new Error(`Supabase query: ${error.message}`)
+
+    console.log('[send-post-visit] Réservations trouvées:', reservations?.length ?? 0)
+
     if (!reservations || reservations.length === 0) {
       return new Response(JSON.stringify({ sent: 0, message: 'Aucun email post-visite à envoyer' }), { status: 200 })
     }
+
+    // Récupère les noms de restaurants séparément
+    const restaurantIds = [...new Set(reservations.map(r => r.restaurant_id))]
+    const { data: restos } = await supabase
+      .from('restaurants')
+      .select('id, nom, slug')
+      .in('id', restaurantIds)
+
+    const restoMap: Record<string, { nom: string; slug: string }> = {}
+    for (const r of restos ?? []) restoMap[r.id] = { nom: r.nom, slug: r.slug }
 
     let sent = 0
     const errors: string[] = []
 
     for (const resa of reservations) {
-      // Filtre précis : la réservation doit être entre -48h et -24h
+      // Filtre précis : entre -48h et -24h
       const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
-      if (resaDatetime >= before24h || resaDatetime < before48h) continue
+      if (resaDatetime >= before24h || resaDatetime < before48h) {
+        console.log(`[send-post-visit] SKIP ${resa.id} — hors fenêtre`)
+        continue
+      }
 
-      const restaurant = Array.isArray(resa.restaurants) ? resa.restaurants[0] : resa.restaurants
+      console.log(`[send-post-visit] Traitement: ${resa.id} | ${resa.date} ${resa.heure}`)
+
+      const resto = restoMap[resa.restaurant_id] ?? { nom: '', slug: '' }
 
       try {
-        // FIX #1 : marquer post_visit_sent = true AVANT le webhook
+        // Marquer avant d'envoyer pour éviter les doublons
         const { error: updateError } = await supabase
           .from('reservations')
           .update({ post_visit_sent: true })
           .eq('id', resa.id)
 
-        if (updateError) throw updateError
+        if (updateError) throw new Error(`Update: ${updateError.message}`)
 
         const webhookRes = await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
@@ -60,22 +79,22 @@ Deno.serve(async (req) => {
             date:         resa.date,
             heure:        resa.heure,
             nb_personnes: resa.nb_personnes,
-            restaurant:   restaurant?.nom ?? '',
-            slug:         restaurant?.slug ?? '',
+            restaurant:   resto.nom,
+            slug:         resto.slug,
           }),
         })
 
         if (!webhookRes.ok) {
-          // Si le webhook échoue, on remet post_visit_sent = false pour réessayer
           await supabase.from('reservations').update({ post_visit_sent: false }).eq('id', resa.id)
-          throw new Error(`Make webhook ${webhookRes.status}`)
+          throw new Error(`Webhook ${webhookRes.status}: ${await webhookRes.text()}`)
         }
 
+        console.log(`[send-post-visit] ✅ Envoyé: ${resa.id}`)
         sent++
 
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e)
-        console.error(`[send-post-visit] Erreur réservation ${resa.id}:`, msg)
+        const msg = e instanceof Error ? e.message : JSON.stringify(e)
+        console.error(`[send-post-visit] Erreur ${resa.id}:`, msg)
         errors.push(`${resa.id}: ${msg}`)
       }
     }
@@ -86,7 +105,7 @@ Deno.serve(async (req) => {
     )
 
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error ? err.message : JSON.stringify(err)
     console.error('[send-post-visit] Erreur globale:', msg)
     return new Response(JSON.stringify({ error: msg }), { status: 500 })
   }
