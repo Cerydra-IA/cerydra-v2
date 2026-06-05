@@ -120,6 +120,10 @@ export default function Dashboard() {
           nb_couverts_max: restoData.nb_couverts_max || '',
           delai_minimum_heures: restoData.delai_minimum_heures ?? 2,
           message_confirmation: restoData.message_confirmation || '',
+          widget_primary_color: restoData.widget_primary_color || '#1a1a2e',
+          widget_bg_color: restoData.widget_bg_color || '#ffffff',
+          widget_button_text: restoData.widget_button_text || 'Confirmer la réservation',
+          widget_bg_image_url: restoData.widget_bg_image_url || '',
         })
         if (restoData.slug) setSlugManuel(true)
 
