@@ -14,14 +14,13 @@ Deno.serve(async (req) => {
 
   try {
     const now   = new Date()
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000)
 
+    // Fenêtre SQL : aujourd'hui + demain (large, filtre précis après)
     const todayStr    = now.toISOString().split('T')[0]
-    const tomorrowStr = in24h.toISOString().split('T')[0]
+    const tomorrowStr = in48h.toISOString().split('T')[0]
 
-    console.log('[send-reminders] ── DEBUT ──────────────────────────────')
     console.log('[send-reminders] now (UTC)    :', now.toISOString())
-    console.log('[send-reminders] in24h (UTC)  :', in24h.toISOString())
     console.log('[send-reminders] SQL date gte :', todayStr)
     console.log('[send-reminders] SQL date lte :', tomorrowStr)
 
@@ -35,33 +34,28 @@ Deno.serve(async (req) => {
 
     if (error) throw error
 
-    console.log('[send-reminders] Réservations trouvées par SQL :', reservations?.length ?? 0)
+    console.log('[send-reminders] Réservations trouvées :', reservations?.length ?? 0)
 
     if (!reservations || reservations.length === 0) {
-      console.log('[send-reminders] Aucune réservation dans la fenêtre SQL')
       return new Response(JSON.stringify({ sent: 0, message: 'Aucun rappel à envoyer' }), { status: 200 })
     }
 
     let sent = 0
-    let skipped = 0
     const errors: string[] = []
 
     for (const resa of reservations) {
-      const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
+      // Seul filtre : la réservation n'est pas déjà passée (date aujourd'hui + heure déjà passée)
+      // On traite TOUT ce qui est dans les 48h à venir — reminder_sent empêche les doublons
+      const resaDateStr = new Date(`${resa.date}T${resa.heure}:00`)
+      const resaDateUTC = new Date(resa.date + 'T00:00:00Z') // minuit UTC de la date
 
-      console.log(`[send-reminders] Réservation ${resa.id}:`)
-      console.log(`  date=${resa.date} heure=${resa.heure}`)
-      console.log(`  resaDatetime (interprété UTC): ${resaDatetime.toISOString()}`)
-      console.log(`  resaDatetime <= now   ? ${resaDatetime <= now} (doit être false)`)
-      console.log(`  resaDatetime > in24h  ? ${resaDatetime > in24h} (doit être false)`)
-      console.log(`  → ${resaDatetime <= now || resaDatetime > in24h ? 'SKIPPED' : 'TRAITÉ'}`)
-
-      // FIX : on élargit légèrement la fenêtre à +26h pour absorber la variance du cron
-      const in26h = new Date(now.getTime() + 26 * 60 * 60 * 1000)
-      if (resaDatetime <= now || resaDatetime > in26h) {
-        skipped++
+      // Si la date de réservation est aujourd'hui et que l'heure est déjà passée → skip
+      if (resa.date === todayStr && resaDateStr.getTime() < now.getTime()) {
+        console.log(`[send-reminders] SKIP ${resa.id} — réservation aujourd'hui mais heure passée`)
         continue
       }
+
+      console.log(`[send-reminders] TRAITÉ ${resa.id} — ${resa.date} ${resa.heure}`)
 
       const restaurant = Array.isArray(resa.restaurants) ? resa.restaurants[0] : resa.restaurants
       const cancelLink = `https://app.cerydra.fr/annuler/${resa.token}`
@@ -101,15 +95,15 @@ Deno.serve(async (req) => {
 
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e)
-        console.error(`[send-reminders] Erreur réservation ${resa.id}:`, msg)
+        console.error(`[send-reminders] Erreur ${resa.id}:`, msg)
         errors.push(`${resa.id}: ${msg}`)
       }
     }
 
-    console.log(`[send-reminders] RÉSULTAT — sent: ${sent}, skipped: ${skipped}, errors: ${errors.length}`)
+    console.log(`[send-reminders] RÉSULTAT — sent: ${sent}, errors: ${errors.length}`)
 
     return new Response(
-      JSON.stringify({ sent, skipped, errors: errors.length > 0 ? errors : undefined }),
+      JSON.stringify({ sent, errors: errors.length > 0 ? errors : undefined }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
 
