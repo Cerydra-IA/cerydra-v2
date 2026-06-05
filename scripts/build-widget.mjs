@@ -120,7 +120,7 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
       +'<select name="heure" id="crd-hs" style="display:none" required></select></div>'
       +'<div class="cf"><label>Message</label><textarea name="message" rows="2" placeholder="Allergies, occasion speciale..."></textarea></div>'
       +'<div id="crd-al" style="display:none" class="al"></div>'
-      +'<button type="submit" class="cs" id="crd-sb">Confirmer la reservation</button>'
+      +'<button type="submit" class="cs" id="crd-sb">'+(resto.widget_button_text||'Confirmer la reservation')+'</button>'
       +'</form>';
   }
 
@@ -212,6 +212,30 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
         cache={resto:data.resto,horaires:data.horaires||[]};
         loaded=true;loading=false;
         var cn=sh.querySelector('.cn');if(cn)cn.textContent=data.resto.nom;
+
+        // Appliquer la personnalisation du widget
+        var r=data.resto;
+        var pc=r.widget_primary_color||'#1a1a2e';
+        var bc=r.widget_bg_color||'#ffffff';
+        var bgImg=r.widget_bg_image_url||'';
+
+        // Injecter les couleurs personnalisées via une balise style
+        var customStyle=sh.getElementById('crd-custom-style');
+        if(!customStyle){customStyle=document.createElement('style');customStyle.id='crd-custom-style';sh.appendChild(customStyle);}
+        customStyle.textContent=
+          '#crd-btn{background:'+pc+' !important;}'
+          +'#crd-btn:hover{background:'+pc+'cc !important;}'
+          +'.cs{background:'+pc+' !important;}'
+          +'.cs:hover{background:'+pc+'cc !important;}'
+          +'input:focus,select:focus,textarea:focus{border-color:'+pc+' !important;}'
+          +'#crd-modal{background:'+bc+' !important;}'
+          +'.ch{background:'+bc+' !important;}'
+          +(bgImg ? '#crd-modal{background-image:url('+bgImg+') !important;background-size:cover !important;background-position:center !important;}' : '');
+
+        // Appliquer la couleur au bouton flottant déjà rendu
+        var btn=sh.getElementById('crd-btn');
+        if(btn)btn.style.background=pc;
+
         sh.getElementById('crd-fa').innerHTML=mkForm(data.resto,data.horaires||[]);
         bindForm(sh,data.resto,data.horaires||[]);
       }).catch(function(e){
