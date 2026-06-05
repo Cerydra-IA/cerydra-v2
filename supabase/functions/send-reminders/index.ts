@@ -19,7 +19,7 @@ Deno.serve(async (_req) => {
     // Requête sans join pour éviter les erreurs PostgREST
     const { data: reservations, error } = await supabase
       .from('reservations')
-      .select('id, prenom, nom, email, date, heure, nb_personnes, statut, token, restaurant_id')
+      .select('id, prenom, nom, email, date, heure, nb_personnes, statut, cancel_token, restaurant_id')
       .eq('reminder_sent', false)
       .neq('statut', 'annulée')
       .gte('date', todayStr)
@@ -60,7 +60,7 @@ Deno.serve(async (_req) => {
       console.log(`[send-reminders] Traitement: ${resa.id} | ${resa.date} ${resa.heure}`)
 
       const resto     = restoMap[resa.restaurant_id] ?? { nom: '', slug: '' }
-      const cancelLink = `https://app.cerydra.fr/annuler/${resa.token}`
+      const cancelLink = `https://app.cerydra.fr/annuler/${resa.cancel_token}`
 
       try {
         // Marquer avant d'envoyer pour éviter les doublons
