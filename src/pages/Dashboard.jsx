@@ -89,6 +89,7 @@ export default function Dashboard() {
   const [horaires, setHoraires] = useState(HORAIRES_DEFAUT)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingBg, setUploadingBg] = useState(false)
   const [slugManuel, setSlugManuel] = useState(false)
   const [toast, setToast] = useState({ message: '', type: 'success' })
 
@@ -479,16 +480,49 @@ export default function Dashboard() {
                   />
                 </Field>
 
-                <Field label="Photo de fond (URL, optionnel)">
-                  <input
-                    type="url"
-                    value={resto.widget_bg_image_url || ''}
-                    onChange={(e) => setResto((r) => ({ ...r, widget_bg_image_url: e.target.value }))}
-                    className={inputCls}
-                    placeholder="https://exemple.com/image.jpg"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Image d'arrière-plan affichée derrière le formulaire</p>
-                </Field>
+                <div>
+                  <label className="block text-xs font-medium text-[#1a1a2e] mb-2">Photo de fond (optionnel)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-[#1a1a2e] hover:text-[#1a1a2e] transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {uploadingBg ? 'Envoi...' : 'Choisir une photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingBg}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          setUploadingBg(true)
+                          const ext = file.name.split('.').pop()
+                          const path = `widget-bg/${restoId || 'tmp'}-${Date.now()}.${ext}`
+                          const { error: upErr } = await supabase.storage.from('widget-images').upload(path, file, { upsert: true })
+                          if (!upErr) {
+                            const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
+                            setResto((r) => ({ ...r, widget_bg_image_url: data.publicUrl }))
+                          }
+                          setUploadingBg(false)
+                        }}
+                      />
+                    </label>
+                    {resto.widget_bg_image_url && (
+                      <div className="flex items-center gap-2">
+                        <img src={resto.widget_bg_image_url} alt="Aperçu" className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+                        <button
+                          type="button"
+                          onClick={() => setResto((r) => ({ ...r, widget_bg_image_url: '' }))}
+                          className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">Image d'arrière-plan affichée derrière le formulaire</p>
+                </div>
               </div>
 
               {/* Aperçu live */}
