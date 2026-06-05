@@ -13,18 +13,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const now = new Date()
-    // Fenêtre : réservations dont la date est entre -25h et -23h (24h après la visite)
-    const from24h = new Date(now.getTime() - 25 * 60 * 60 * 1000)
-    const to24h   = new Date(now.getTime() - 23 * 60 * 60 * 1000)
+    const now      = new Date()
+    // FIX #2 : fenêtre large sur la date, filtre précis côté JS sur datetime
+    // Cherche toutes les réservations passées depuis plus de 24h (jusqu'à 48h pour rattraper)
+    const before24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const before48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+
+    const before24hStr = before24h.toISOString().split('T')[0]
+    const before48hStr = before48h.toISOString().split('T')[0]
 
     const { data: reservations, error } = await supabase
       .from('reservations')
       .select('id, prenom, nom, email, date, heure, nb_personnes, restaurants(nom, slug)')
       .eq('post_visit_sent', false)
       .eq('statut', 'confirmée')
-      .gte('date', from24h.toISOString().split('T')[0])
-      .lte('date', to24h.toISOString().split('T')[0])
+      .gte('date', before48hStr)
+      .lte('date', before24hStr)
 
     if (error) throw error
     if (!reservations || reservations.length === 0) {
@@ -35,13 +39,21 @@ Deno.serve(async (req) => {
     const errors: string[] = []
 
     for (const resa of reservations) {
-      // Filtre précis sur heure pour rester dans la fenêtre [-25h, -23h]
+      // Filtre précis : la réservation doit être entre -48h et -24h
       const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
-      if (resaDatetime > to24h || resaDatetime < from24h) continue
+      if (resaDatetime >= before24h || resaDatetime < before48h) continue
 
       const restaurant = Array.isArray(resa.restaurants) ? resa.restaurants[0] : resa.restaurants
 
       try {
+        // FIX #1 : marquer post_visit_sent = true AVANT le webhook
+        const { error: updateError } = await supabase
+          .from('reservations')
+          .update({ post_visit_sent: true })
+          .eq('id', resa.id)
+
+        if (updateError) throw updateError
+
         const webhookRes = await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -59,15 +71,11 @@ Deno.serve(async (req) => {
         })
 
         if (!webhookRes.ok) {
-          throw new Error(`Make webhook ${webhookRes.status}: ${await webhookRes.text()}`)
+          // Si le webhook échoue, on remet post_visit_sent = false pour réessayer
+          await supabase.from('reservations').update({ post_visit_sent: false }).eq('id', resa.id)
+          throw new Error(`Make webhook ${webhookRes.status}`)
         }
 
-        const { error: updateError } = await supabase
-          .from('reservations')
-          .update({ post_visit_sent: true })
-          .eq('id', resa.id)
-
-        if (updateError) throw updateError
         sent++
 
       } catch (e: unknown) {

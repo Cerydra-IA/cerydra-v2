@@ -19,8 +19,6 @@ Deno.serve(async (req) => {
     const todayStr    = now.toISOString().split('T')[0]
     const tomorrowStr = in24h.toISOString().split('T')[0]
 
-    // Récupère toutes les réservations sur today et tomorrow
-    // non encore rappelées et non annulées
     const { data: reservations, error } = await supabase
       .from('reservations')
       .select('id, prenom, nom, email, date, heure, nb_personnes, statut, token, restaurants(nom, slug)')
@@ -38,7 +36,6 @@ Deno.serve(async (req) => {
     const errors: string[] = []
 
     for (const resa of reservations) {
-      // Filtre précis : la réservation doit être dans les prochaines 24h (pas déjà passée)
       const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
       if (resaDatetime <= now || resaDatetime > in24h) continue
 
@@ -46,6 +43,15 @@ Deno.serve(async (req) => {
       const cancelLink = `https://app.cerydra.fr/annuler/${resa.token}`
 
       try {
+        // FIX #1 : marquer reminder_sent = true AVANT le webhook
+        // pour éviter un double envoi si le webhook réussit mais l'update échoue
+        const { error: updateError } = await supabase
+          .from('reservations')
+          .update({ reminder_sent: true })
+          .eq('id', resa.id)
+
+        if (updateError) throw updateError
+
         const webhookRes = await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -64,15 +70,11 @@ Deno.serve(async (req) => {
         })
 
         if (!webhookRes.ok) {
-          throw new Error(`Make webhook ${webhookRes.status}: ${await webhookRes.text()}`)
+          // Si le webhook échoue, on remet reminder_sent = false pour réessayer
+          await supabase.from('reservations').update({ reminder_sent: false }).eq('id', resa.id)
+          throw new Error(`Make webhook ${webhookRes.status}`)
         }
 
-        const { error: updateError } = await supabase
-          .from('reservations')
-          .update({ reminder_sent: true })
-          .eq('id', resa.id)
-
-        if (updateError) throw updateError
         sent++
 
       } catch (e: unknown) {

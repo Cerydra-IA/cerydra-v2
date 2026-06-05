@@ -60,7 +60,7 @@ export default async function handler(req) {
   try {
     // ── GET : récupère restaurant + horaires ──────────────────────
     if (req.method === 'GET') {
-      const restos = await sbGet('restaurants', `slug=eq.${slug}&select=*`)
+      const restos = await sbGet('restaurants', `slug=eq.${encodeURIComponent(slug)}&select=*`)
       if (!restos || restos.length === 0) {
         return new Response(JSON.stringify({ error: 'Restaurant introuvable' }), { status: 404, headers })
       }
@@ -72,8 +72,26 @@ export default async function handler(req) {
     // ── POST : crée une réservation ───────────────────────────────
     if (req.method === 'POST') {
       const body = await req.json()
+
+      // FIX #4 : validation serveur
+      if (!body.prenom || !body.nom) {
+        return new Response(JSON.stringify({ error: 'Prénom et nom requis' }), { status: 422, headers })
+      }
+      if (!body.email || !/^[^s@]+@[^s@]+.[^s@]+$/.test(body.email)) {
+        return new Response(JSON.stringify({ error: 'Email invalide' }), { status: 422, headers })
+      }
+      if (!body.date || !/^d{4}-d{2}-d{2}$/.test(body.date)) {
+        return new Response(JSON.stringify({ error: 'Date invalide' }), { status: 422, headers })
+      }
+      if (!body.heure || !/^d{2}:d{2}$/.test(body.heure)) {
+        return new Response(JSON.stringify({ error: 'Heure invalide' }), { status: 422, headers })
+      }
+      if (!body.nb_personnes || isNaN(Number(body.nb_personnes)) || Number(body.nb_personnes) < 1) {
+        return new Response(JSON.stringify({ error: 'Nombre de personnes invalide' }), { status: 422, headers })
+      }
+
       // Vérifie que le restaurant_id correspond bien au slug
-      const restos = await sbGet('restaurants', `slug=eq.${slug}&select=id`)
+      const restos = await sbGet('restaurants', `slug=eq.${encodeURIComponent(slug)}&select=id`)
       if (!restos || restos.length === 0) {
         return new Response(JSON.stringify({ error: 'Restaurant introuvable' }), { status: 404, headers })
       }
