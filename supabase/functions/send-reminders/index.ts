@@ -19,6 +19,12 @@ Deno.serve(async (req) => {
     const todayStr    = now.toISOString().split('T')[0]
     const tomorrowStr = in24h.toISOString().split('T')[0]
 
+    console.log('[send-reminders] ── DEBUT ──────────────────────────────')
+    console.log('[send-reminders] now (UTC)    :', now.toISOString())
+    console.log('[send-reminders] in24h (UTC)  :', in24h.toISOString())
+    console.log('[send-reminders] SQL date gte :', todayStr)
+    console.log('[send-reminders] SQL date lte :', tomorrowStr)
+
     const { data: reservations, error } = await supabase
       .from('reservations')
       .select('id, prenom, nom, email, date, heure, nb_personnes, statut, token, restaurants(nom, slug)')
@@ -28,23 +34,39 @@ Deno.serve(async (req) => {
       .lte('date', tomorrowStr)
 
     if (error) throw error
+
+    console.log('[send-reminders] Réservations trouvées par SQL :', reservations?.length ?? 0)
+
     if (!reservations || reservations.length === 0) {
+      console.log('[send-reminders] Aucune réservation dans la fenêtre SQL')
       return new Response(JSON.stringify({ sent: 0, message: 'Aucun rappel à envoyer' }), { status: 200 })
     }
 
     let sent = 0
+    let skipped = 0
     const errors: string[] = []
 
     for (const resa of reservations) {
       const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
-      if (resaDatetime <= now || resaDatetime > in24h) continue
+
+      console.log(`[send-reminders] Réservation ${resa.id}:`)
+      console.log(`  date=${resa.date} heure=${resa.heure}`)
+      console.log(`  resaDatetime (interprété UTC): ${resaDatetime.toISOString()}`)
+      console.log(`  resaDatetime <= now   ? ${resaDatetime <= now} (doit être false)`)
+      console.log(`  resaDatetime > in24h  ? ${resaDatetime > in24h} (doit être false)`)
+      console.log(`  → ${resaDatetime <= now || resaDatetime > in24h ? 'SKIPPED' : 'TRAITÉ'}`)
+
+      // FIX : on élargit légèrement la fenêtre à +26h pour absorber la variance du cron
+      const in26h = new Date(now.getTime() + 26 * 60 * 60 * 1000)
+      if (resaDatetime <= now || resaDatetime > in26h) {
+        skipped++
+        continue
+      }
 
       const restaurant = Array.isArray(resa.restaurants) ? resa.restaurants[0] : resa.restaurants
       const cancelLink = `https://app.cerydra.fr/annuler/${resa.token}`
 
       try {
-        // FIX #1 : marquer reminder_sent = true AVANT le webhook
-        // pour éviter un double envoi si le webhook réussit mais l'update échoue
         const { error: updateError } = await supabase
           .from('reservations')
           .update({ reminder_sent: true })
@@ -70,11 +92,11 @@ Deno.serve(async (req) => {
         })
 
         if (!webhookRes.ok) {
-          // Si le webhook échoue, on remet reminder_sent = false pour réessayer
           await supabase.from('reservations').update({ reminder_sent: false }).eq('id', resa.id)
           throw new Error(`Make webhook ${webhookRes.status}`)
         }
 
+        console.log(`[send-reminders] ✅ Rappel envoyé : ${resa.id}`)
         sent++
 
       } catch (e: unknown) {
@@ -84,8 +106,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(`[send-reminders] RÉSULTAT — sent: ${sent}, skipped: ${skipped}, errors: ${errors.length}`)
+
     return new Response(
-      JSON.stringify({ sent, errors: errors.length > 0 ? errors : undefined }),
+      JSON.stringify({ sent, skipped, errors: errors.length > 0 ? errors : undefined }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
 
