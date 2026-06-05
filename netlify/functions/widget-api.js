@@ -77,13 +77,13 @@ export default async function handler(req) {
       if (!body.prenom || !body.nom) {
         return new Response(JSON.stringify({ error: 'Prénom et nom requis' }), { status: 422, headers })
       }
-      if (!body.email || !/^[^s@]+@[^s@]+.[^s@]+$/.test(body.email)) {
+      if (!body.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
         return new Response(JSON.stringify({ error: 'Email invalide' }), { status: 422, headers })
       }
-      if (!body.date || !/^d{4}-d{2}-d{2}$/.test(body.date)) {
+      if (!body.date || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
         return new Response(JSON.stringify({ error: 'Date invalide' }), { status: 422, headers })
       }
-      if (!body.heure || !/^d{2}:d{2}$/.test(body.heure)) {
+      if (!body.heure || !/^\d{2}:\d{2}$/.test(body.heure)) {
         return new Response(JSON.stringify({ error: 'Heure invalide' }), { status: 422, headers })
       }
       if (!body.nb_personnes || isNaN(Number(body.nb_personnes)) || Number(body.nb_personnes) < 1) {
