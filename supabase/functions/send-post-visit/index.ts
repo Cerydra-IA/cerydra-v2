@@ -7,11 +7,6 @@ const MAKE_WEBHOOK_URL = Deno.env.get('MAKE_POST_VISIT_WEBHOOK_URL')!
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
 Deno.serve(async (req) => {
-  const auth = req.headers.get('Authorization') ?? ''
-  if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-  }
-
   try {
     const now      = new Date()
     // FIX #2 : fenêtre large sur la date, filtre précis côté JS sur datetime

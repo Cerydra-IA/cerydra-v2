@@ -7,11 +7,6 @@ const MAKE_WEBHOOK_URL = Deno.env.get('MAKE_REMINDER_WEBHOOK_URL')!
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
 Deno.serve(async (req) => {
-  const auth = req.headers.get('Authorization') ?? ''
-  if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-  }
-
   try {
     const now   = new Date()
     const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000)
