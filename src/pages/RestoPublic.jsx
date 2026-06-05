@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Logo from '../components/Logo'
 
@@ -83,7 +83,27 @@ function NotFound() {
 
 // ─── Page de confirmation ──────────────────────────────────────────────────────
 
-function Confirmation({ resto, form }) {
+function Confirmation({ resto, form, isWidget }) {
+  if (isWidget) {
+    return (
+      <div className="p-6 text-center">
+        <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="text-lg font-bold text-[#1a1a2e] mb-2">Réservation confirmée !</h2>
+        <p className="text-gray-500 text-sm mb-4 leading-relaxed">
+          {resto.message_confirmation || `Merci ${form.prenom}, votre réservation chez ${resto.nom} est bien enregistrée.`}
+        </p>
+        <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-gray-400">Date</span><span className="font-medium text-[#1a1a2e]">{new Date(form.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Heure</span><span className="font-medium text-[#1a1a2e]">{form.heure}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Personnes</span><span className="font-medium text-[#1a1a2e]">{form.nb_personnes}</span></div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="border-b border-gray-100 px-6 py-4 flex items-center justify-center">
@@ -149,6 +169,8 @@ const FORM_DEFAUT = {
 
 export default function RestoPublic() {
   const { slug } = useParams()
+  const { search } = useLocation()
+  const isWidget = new URLSearchParams(search).get('widget') === 'true'
   const [resto, setResto] = useState(null)
   const [horaires, setHoraires] = useState([])
   const [loading, setLoading] = useState(true)
@@ -234,21 +256,23 @@ export default function RestoPublic() {
   }
 
   if (!resto) return <NotFound />
-  if (confirmed) return <Confirmation resto={resto} form={form} />
+  if (confirmed) return <Confirmation resto={resto} form={form} isWidget={isWidget} />
 
   const minDate = getMinDate(resto.delai_minimum_heures)
   const jourFerme = form.date && slots.length === 0
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-100 px-6 py-4 flex items-center justify-center">
-        <Logo size="sm" />
-      </header>
+    <div className={isWidget ? 'bg-white' : 'min-h-screen bg-white flex flex-col'}>
+      {/* Header — masqué en mode widget */}
+      {!isWidget && (
+        <header className="border-b border-gray-100 px-6 py-4 flex items-center justify-center">
+          <Logo size="sm" />
+        </header>
+      )}
 
-      <div className="flex-1 max-w-lg mx-auto w-full px-6 py-10">
-        {/* Infos restaurant */}
-        <div className="mb-8">
+      <div className={isWidget ? 'p-4' : 'flex-1 max-w-lg mx-auto w-full px-6 py-10'}>
+        {/* Infos restaurant — masquées en mode widget */}
+        {!isWidget && <div className="mb-8">
           <h1 className="text-2xl font-bold text-[#1a1a2e] mb-1">{resto.nom}</h1>
           {resto.description && (
             <p className="text-gray-500 text-sm leading-relaxed">{resto.description}</p>
@@ -275,6 +299,7 @@ export default function RestoPublic() {
             </div>
           )}
         </div>
+        </div>}
 
         {/* Formulaire */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -367,9 +392,11 @@ export default function RestoPublic() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-300 mt-6">
-          Propulsé par <span className="font-medium text-gray-400">CERYDRA</span>
-        </p>
+        {!isWidget && (
+          <p className="text-center text-xs text-gray-300 mt-6">
+            Propulsé par <span className="font-medium text-gray-400">CERYDRA</span>
+          </p>
+        )}
       </div>
     </div>
   )
