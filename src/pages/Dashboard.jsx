@@ -420,6 +420,118 @@ export default function Dashboard() {
             </div>
           </SectionCard>
 
+          {/* Personnalisation du widget */}
+          <SectionCard
+            title="Personnalisation du widget"
+            description="Personnalisez l'apparence de votre page de réservation publique."
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Contrôles */}
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[#1a1a2e] mb-2">Couleur principale</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={resto.widget_primary_color || '#1a1a2e'}
+                        onChange={(e) => setResto((r) => ({ ...r, widget_primary_color: e.target.value }))}
+                        className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={resto.widget_primary_color || '#1a1a2e'}
+                        onChange={(e) => setResto((r) => ({ ...r, widget_primary_color: e.target.value }))}
+                        className={inputCls + ' font-mono text-xs'}
+                        placeholder="#1a1a2e"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#1a1a2e] mb-2">Couleur de fond</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={resto.widget_bg_color || '#ffffff'}
+                        onChange={(e) => setResto((r) => ({ ...r, widget_bg_color: e.target.value }))}
+                        className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={resto.widget_bg_color || '#ffffff'}
+                        onChange={(e) => setResto((r) => ({ ...r, widget_bg_color: e.target.value }))}
+                        className={inputCls + ' font-mono text-xs'}
+                        placeholder="#ffffff"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Field label="Texte du bouton de confirmation">
+                  <input
+                    type="text"
+                    value={resto.widget_button_text || ''}
+                    onChange={(e) => setResto((r) => ({ ...r, widget_button_text: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Confirmer la réservation"
+                  />
+                </Field>
+
+                <Field label="Photo de fond (URL, optionnel)">
+                  <input
+                    type="url"
+                    value={resto.widget_bg_image_url || ''}
+                    onChange={(e) => setResto((r) => ({ ...r, widget_bg_image_url: e.target.value }))}
+                    className={inputCls}
+                    placeholder="https://exemple.com/image.jpg"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Image d'arrière-plan affichée derrière le formulaire</p>
+                </Field>
+              </div>
+
+              {/* Aperçu live */}
+              <div>
+                <label className="block text-xs font-medium text-[#1a1a2e] mb-2">Aperçu</label>
+                <div
+                  className="rounded-2xl overflow-hidden border border-gray-200 relative"
+                  style={{
+                    backgroundColor: resto.widget_bg_color || '#ffffff',
+                    backgroundImage: resto.widget_bg_image_url ? `url('${resto.widget_bg_image_url}')` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    minHeight: '240px',
+                  }}
+                >
+                  {resto.widget_bg_image_url && (
+                    <div className="absolute inset-0 bg-black/30 rounded-2xl" />
+                  )}
+                  <div className="relative z-10 p-5">
+                    <div className="bg-white rounded-xl p-4 shadow-sm">
+                      <p className="text-xs font-semibold text-[#1a1a2e] mb-3">{resto.nom || 'Votre restaurant'}</p>
+                      <div className="space-y-2 mb-3">
+                        <div className="h-7 bg-gray-100 rounded-lg" />
+                        <div className="h-7 bg-gray-100 rounded-lg" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="h-7 bg-gray-100 rounded-lg" />
+                          <div className="h-7 bg-gray-100 rounded-lg" />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="w-full py-2 rounded-lg text-xs font-medium text-white transition-colors"
+                        style={{ backgroundColor: resto.widget_primary_color || '#1a1a2e' }}
+                      >
+                        {resto.widget_button_text || 'Confirmer la réservation'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
           {/* Bouton bas de page */}
           <div className="flex justify-end pb-8">
             <button

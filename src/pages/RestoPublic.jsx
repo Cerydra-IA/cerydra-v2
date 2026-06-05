@@ -262,7 +262,15 @@ export default function RestoPublic() {
   const jourFerme = form.date && slots.length === 0
 
   return (
-    <div className={isWidget ? 'bg-white' : 'min-h-screen bg-white flex flex-col'}>
+    <div
+      className={isWidget ? '' : 'min-h-screen flex flex-col'}
+      style={{
+        backgroundColor: resto.widget_bg_color || '#ffffff',
+        backgroundImage: resto.widget_bg_image_url ? `url('${resto.widget_bg_image_url}')` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       {/* Header — masqué en mode widget */}
       {!isWidget && (
         <header className="border-b border-gray-100 px-6 py-4 flex items-center justify-center">
@@ -386,9 +394,10 @@ export default function RestoPublic() {
             <button
               type="submit"
               disabled={submitting || jourFerme || !form.date}
-              className="w-full py-3.5 bg-[#1a1a2e] text-white rounded-xl font-medium text-sm hover:bg-[#2a2a4e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1"
+              className="w-full py-3.5 text-white rounded-xl font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1"
+              style={{ backgroundColor: submitting || jourFerme || !form.date ? undefined : (resto.widget_primary_color || '#1a1a2e') }}
             >
-              {submitting ? 'Envoi en cours...' : 'Confirmer la réservation'}
+              {submitting ? 'Envoi en cours...' : (resto.widget_button_text || 'Confirmer la réservation')}
             </button>
           </form>
         </div>
