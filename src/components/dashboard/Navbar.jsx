@@ -4,6 +4,7 @@ import Logo from '../Logo'
 
 const navItems = [
   { to: '/dashboard', label: 'Configuration' },
+  { to: '/dashboard/statistiques', label: 'Statistiques' },
   { to: '/dashboard/reservations', label: 'Réservations' },
 ]
 
