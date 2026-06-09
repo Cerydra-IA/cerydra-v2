@@ -38,8 +38,9 @@ Deno.serve(async (_req) => {
     const windowEnd   = new Date(windowEndMs)
 
     // Plage SQL large pour couvrir le décalage horaire Paris/UTC
-    const dateFrom = windowStart.toISOString().split('T')[0]
-    const dateTo   = windowEnd.toISOString().split('T')[0]
+    // ±1 jour de marge pour ne pas rater les réservations en bordure de journée (DST, minuit Paris)
+    const dateFrom = new Date(windowStartMs - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const dateTo   = new Date(windowEndMs   + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     console.log('[send-post-visit] now (UTC):', now.toISOString())
     console.log('[send-post-visit] fenêtre UTC:', windowStart.toISOString(), '->', windowEnd.toISOString())

@@ -49,8 +49,9 @@ Deno.serve(async (_req) => {
     // Pour la requête SQL, on prend une plage de dates large (couvre J à J+2)
     // pour ne pas rater des réservations à cause du décalage horaire Paris/UTC.
     // Le filtre précis se fait ensuite en JS avec parisToUtcMs.
-    const dateFrom = windowStart.toISOString().split('T')[0]
-    const dateTo   = windowEnd.toISOString().split('T')[0]
+    // ±1 jour de marge pour ne pas rater les réservations en bordure de journée (DST, minuit Paris)
+    const dateFrom = new Date(windowStartMs - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const dateTo   = new Date(windowEndMs   + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     console.log('[send-reminders] now (UTC):', now.toISOString())
     console.log('[send-reminders] fenêtre UTC:', windowStart.toISOString(), '->', windowEnd.toISOString())

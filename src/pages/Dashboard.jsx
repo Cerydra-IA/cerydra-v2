@@ -27,6 +27,10 @@ const RESTO_DEFAUT = {
   nb_couverts_max: '',
   delai_minimum_heures: 2,
   message_confirmation: 'Merci pour votre réservation ! Nous avons hâte de vous accueillir.',
+  widget_primary_color: '#1a1a2e',
+  widget_bg_color: '#ffffff',
+  widget_button_text: 'Réserver',
+  widget_bg_image_url: '',
 }
 
 function Toast({ message, type }) {
