@@ -6,36 +6,85 @@ const MAKE_WEBHOOK_URL = Deno.env.get('MAKE_POST_VISIT_WEBHOOK_URL')!
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
+/**
+ * Convertit une date+heure saisie en heure locale Europe/Paris
+ * vers un timestamp UTC en millisecondes.
+ */
+function parisToUtcMs(dateStr: string, heureStr: string): number {
+  const approxUtc = new Date(`${dateStr}T${heureStr}:00Z`)
+
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+  const parts = fmt.formatToParts(approxUtc)
+  const p = (t: string) => parseInt(parts.find(x => x.type === t)!.value)
+  const parisEquiv = new Date(Date.UTC(p('year'), p('month') - 1, p('day'), p('hour'), p('minute')))
+
+  const offsetMs = approxUtc.getTime() - parisEquiv.getTime()
+  return approxUtc.getTime() + offsetMs
+}
+
 Deno.serve(async (_req) => {
   try {
-    const now      = new Date()
-    const before24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    const before48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+    const now = new Date()
 
-    const before24hStr = before24h.toISOString().split('T')[0]
-    const before48hStr = before48h.toISOString().split('T')[0]
+    // Fenêtre cible : réservations dont l'heure Paris était entre now-26h et now-22h
+    const windowStartMs = now.getTime() - 26 * 60 * 60 * 1000
+    const windowEndMs   = now.getTime() - 22 * 60 * 60 * 1000
 
-    console.log('[send-post-visit] now:', now.toISOString(), '| fenêtre:', before48hStr, '->', before24hStr)
+    const windowStart = new Date(windowStartMs)
+    const windowEnd   = new Date(windowEndMs)
 
-    // Requête sans join pour éviter les erreurs PostgREST
+    // Plage SQL large pour couvrir le décalage horaire Paris/UTC
+    const dateFrom = windowStart.toISOString().split('T')[0]
+    const dateTo   = windowEnd.toISOString().split('T')[0]
+
+    console.log('[send-post-visit] now (UTC):', now.toISOString())
+    console.log('[send-post-visit] fenêtre UTC:', windowStart.toISOString(), '->', windowEnd.toISOString())
+    console.log('[send-post-visit] plage SQL dates:', dateFrom, '->', dateTo)
+
     const { data: reservations, error } = await supabase
       .from('reservations')
       .select('id, prenom, nom, email, date, heure, nb_personnes, restaurant_id')
       .eq('post_visit_sent', false)
       .eq('statut', 'confirmée')
-      .gte('date', before48hStr)
-      .lte('date', before24hStr)
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
 
     if (error) throw new Error(`Supabase query: ${error.message}`)
 
-    console.log('[send-post-visit] Réservations trouvées:', reservations?.length ?? 0)
+    console.log('[send-post-visit] Réservations dans la plage SQL:', reservations?.length ?? 0)
 
     if (!reservations || reservations.length === 0) {
       return new Response(JSON.stringify({ sent: 0, message: 'Aucun email post-visite à envoyer' }), { status: 200 })
     }
 
+    // Filtre précis timezone : heure de réservation (Paris) convertie en UTC
+    // doit être dans [now-26h, now-22h]
+    const qualifying = reservations.filter(resa => {
+      const resaUtcMs = parisToUtcMs(resa.date, resa.heure)
+      const inWindow  = resaUtcMs >= windowStartMs && resaUtcMs <= windowEndMs
+      console.log(
+        `[send-post-visit] ${resa.id} | Paris: ${resa.date} ${resa.heure}`,
+        `| UTC: ${new Date(resaUtcMs).toISOString()}`,
+        `| dans fenêtre: ${inWindow}`
+      )
+      return inWindow
+    })
+
+    console.log('[send-post-visit] Après filtre timezone:', qualifying.length)
+
+    if (qualifying.length === 0) {
+      return new Response(
+        JSON.stringify({ sent: 0, message: 'Aucun email post-visite dans la fenêtre 22h-26h' }),
+        { status: 200 }
+      )
+    }
+
     // Récupère les noms de restaurants séparément
-    const restaurantIds = [...new Set(reservations.map(r => r.restaurant_id))]
+    const restaurantIds = [...new Set(qualifying.map(r => r.restaurant_id))]
     const { data: restos } = await supabase
       .from('restaurants')
       .select('id, nom, slug')
@@ -47,14 +96,7 @@ Deno.serve(async (_req) => {
     let sent = 0
     const errors: string[] = []
 
-    for (const resa of reservations) {
-      // Filtre précis : entre -48h et -24h
-      const resaDatetime = new Date(`${resa.date}T${resa.heure}:00`)
-      if (resaDatetime >= before24h || resaDatetime < before48h) {
-        console.log(`[send-post-visit] SKIP ${resa.id} — hors fenêtre`)
-        continue
-      }
-
+    for (const resa of qualifying) {
       console.log(`[send-post-visit] Traitement: ${resa.id} | ${resa.date} ${resa.heure}`)
 
       const resto = restoMap[resa.restaurant_id] ?? { nom: '', slug: '' }
