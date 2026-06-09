@@ -86,8 +86,14 @@ export default async function handler(req) {
       if (!body.heure || !/^\d{2}:\d{2}$/.test(body.heure)) {
         return new Response(JSON.stringify({ error: 'Heure invalide' }), { status: 422, headers })
       }
-      if (!body.nb_personnes || isNaN(Number(body.nb_personnes)) || Number(body.nb_personnes) < 1) {
+      if (!body.nb_personnes || isNaN(Number(body.nb_personnes)) || Number(body.nb_personnes) < 1 || Number(body.nb_personnes) > 20) {
         return new Response(JSON.stringify({ error: 'Nombre de personnes invalide' }), { status: 422, headers })
+      }
+
+      // Vérifie que la date n'est pas dans le passé
+      const today = new Date().toISOString().split('T')[0]
+      if (body.date < today) {
+        return new Response(JSON.stringify({ error: 'Date dans le passé' }), { status: 422, headers })
       }
 
       // Vérifie que le restaurant_id correspond bien au slug
