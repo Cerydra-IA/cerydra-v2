@@ -11,7 +11,8 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
  * vers un timestamp UTC en millisecondes.
  */
 function parisToUtcMs(dateStr: string, heureStr: string): number {
-  const approxUtc = new Date(`${dateStr}T${heureStr}:00Z`)
+  const heure5 = heureStr.slice(0, 5) // normalise "13:00:00" → "13:00"
+  const approxUtc = new Date(`${dateStr}T${heure5}:00Z`)
 
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Paris',
