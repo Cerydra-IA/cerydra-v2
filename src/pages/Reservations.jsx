@@ -199,93 +199,158 @@ export default function Reservations() {
             <p className="text-gray-400 text-sm">Aucune réservation{filtre !== 'toutes' ? ' dans cette catégorie' : ''}.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            {/* Header tableau */}
-            <div className="grid px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-400"
-              style={{ gridTemplateColumns: '1fr 1fr 80px 100px 120px 100px' }}>
-              <span>Client</span>
-              <span>Contact</span>
-              <span>Couverts</span>
-              <span>Date</span>
-              <span>Heure</span>
-              <span>Statut</span>
-            </div>
+          <>
+            {/* ── MOBILE : cartes ─────────────────────────────────── */}
+            <div className="flex flex-col gap-3 md:hidden">
+              {filtered.map((r) => (
+                <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+                  {/* Ligne 1 : nom + badge statut */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-[#1a1a2e] text-sm">{r.prenom} {r.nom}</p>
+                      {r.message && (
+                        <p className="text-xs text-gray-400 mt-0.5">💬 {r.message}</p>
+                      )}
+                    </div>
+                    <Badge statut={r.statut} />
+                  </div>
 
-            {/* Lignes */}
-            {filtered.map((r, i) => (
-              <div
-                key={r.id}
-                className={`grid px-5 py-4 items-center gap-2 text-sm ${
-                  i < filtered.length - 1 ? 'border-b border-gray-50' : ''
-                } hover:bg-gray-50/50 transition-colors`}
-                style={{ gridTemplateColumns: '1fr 1fr 80px 100px 120px 100px' }}
-              >
-                {/* Client */}
-                <div>
-                  <p className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</p>
-                  {r.message && (
-                    <p className="text-xs text-gray-400 truncate max-w-[180px]" title={r.message}>
-                      💬 {r.message}
-                    </p>
-                  )}
-                </div>
+                  {/* Ligne 2 : date + heure + couverts */}
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {formatDate(r.date)}
+                    </span>
+                    <span className="font-semibold text-[#1a1a2e]">{r.heure?.slice(0, 5)}</span>
+                    <span>{r.nb_personnes} pers.</span>
+                  </div>
 
-                {/* Contact */}
-                <div className="space-y-0.5">
-                  <p className="text-gray-500 text-xs">{r.email}</p>
-                  <p className="text-gray-400 text-xs">{r.telephone}</p>
-                </div>
+                  {/* Ligne 3 : contact */}
+                  <div className="text-xs text-gray-400 space-y-0.5">
+                    <p>{r.email}</p>
+                    {r.telephone && <p>{r.telephone}</p>}
+                  </div>
 
-                {/* Couverts */}
-                <span className="text-gray-600">{r.nb_personnes} pers.</span>
-
-                {/* Date */}
-                <span className="text-gray-600 text-xs">{formatDate(r.date)}</span>
-
-                {/* Heure */}
-                <span className="font-medium text-[#1a1a2e]">{r.heure?.slice(0, 5)}</span>
-
-                {/* Statut + actions */}
-                <div className="flex flex-col gap-1">
-                  <Badge statut={r.statut} />
-                  {r.statut === 'en_attente' && (
-                    <div className="flex gap-1 mt-0.5">
-                      <button
-                        onClick={() => updateStatut(r.id, 'confirmée')}
-                        disabled={updatingId === r.id}
-                        className="text-xs text-green-600 hover:underline disabled:opacity-40"
-                      >
-                        Confirmer
-                      </button>
-                      <span className="text-gray-300">·</span>
+                  {/* Ligne 4 : actions */}
+                  <div className="flex gap-2 pt-1 border-t border-gray-50">
+                    {r.statut === 'en_attente' && (
+                      <>
+                        <button
+                          onClick={() => updateStatut(r.id, 'confirmée')}
+                          disabled={updatingId === r.id}
+                          className="flex-1 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-40"
+                        >
+                          Confirmer
+                        </button>
+                        <button
+                          onClick={() => updateStatut(r.id, 'annulée')}
+                          disabled={updatingId === r.id}
+                          className="flex-1 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40"
+                        >
+                          Annuler
+                        </button>
+                      </>
+                    )}
+                    {r.statut === 'confirmée' && (
                       <button
                         onClick={() => updateStatut(r.id, 'annulée')}
                         disabled={updatingId === r.id}
-                        className="text-xs text-red-400 hover:underline disabled:opacity-40"
+                        className="flex-1 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40"
                       >
                         Annuler
                       </button>
-                    </div>
-                  )}
-                  {r.statut === 'confirmée' && (
+                    )}
                     <button
-                      onClick={() => updateStatut(r.id, 'annulée')}
-                      disabled={updatingId === r.id}
-                      className="text-xs text-red-400 hover:underline disabled:opacity-40 mt-0.5"
+                      onClick={() => deleteReservation(r.id)}
+                      className="px-3 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium hover:bg-gray-100 hover:text-red-500 transition-colors"
                     >
-                      Annuler
+                      Supprimer
                     </button>
-                  )}
-                  <button
-                    onClick={() => deleteReservation(r.id)}
-                    className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5 underline-offset-2 hover:underline"
-                  >
-                    Supprimer
-                  </button>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* ── DESKTOP : tableau ───────────────────────────────── */}
+            <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              {/* Header tableau */}
+              <div className="grid px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-400"
+                style={{ gridTemplateColumns: '1fr 1fr 80px 100px 120px 100px' }}>
+                <span>Client</span>
+                <span>Contact</span>
+                <span>Couverts</span>
+                <span>Date</span>
+                <span>Heure</span>
+                <span>Statut</span>
               </div>
-            ))}
-          </div>
+
+              {/* Lignes */}
+              {filtered.map((r, i) => (
+                <div
+                  key={r.id}
+                  className={`grid px-5 py-4 items-center gap-2 text-sm ${
+                    i < filtered.length - 1 ? 'border-b border-gray-50' : ''
+                  } hover:bg-gray-50/50 transition-colors`}
+                  style={{ gridTemplateColumns: '1fr 1fr 80px 100px 120px 100px' }}
+                >
+                  <div>
+                    <p className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</p>
+                    {r.message && (
+                      <p className="text-xs text-gray-400 truncate max-w-[180px]" title={r.message}>
+                        💬 {r.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-gray-500 text-xs">{r.email}</p>
+                    <p className="text-gray-400 text-xs">{r.telephone}</p>
+                  </div>
+                  <span className="text-gray-600">{r.nb_personnes} pers.</span>
+                  <span className="text-gray-600 text-xs">{formatDate(r.date)}</span>
+                  <span className="font-medium text-[#1a1a2e]">{r.heure?.slice(0, 5)}</span>
+                  <div className="flex flex-col gap-1">
+                    <Badge statut={r.statut} />
+                    {r.statut === 'en_attente' && (
+                      <div className="flex gap-1 mt-0.5">
+                        <button
+                          onClick={() => updateStatut(r.id, 'confirmée')}
+                          disabled={updatingId === r.id}
+                          className="text-xs text-green-600 hover:underline disabled:opacity-40"
+                        >
+                          Confirmer
+                        </button>
+                        <span className="text-gray-300">·</span>
+                        <button
+                          onClick={() => updateStatut(r.id, 'annulée')}
+                          disabled={updatingId === r.id}
+                          className="text-xs text-red-400 hover:underline disabled:opacity-40"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    )}
+                    {r.statut === 'confirmée' && (
+                      <button
+                        onClick={() => updateStatut(r.id, 'annulée')}
+                        disabled={updatingId === r.id}
+                        className="text-xs text-red-400 hover:underline disabled:opacity-40 mt-0.5"
+                      >
+                        Annuler
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteReservation(r.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5 underline-offset-2 hover:underline"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
