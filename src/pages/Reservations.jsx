@@ -34,6 +34,24 @@ export default function Reservations() {
   const [filtre, setFiltre] = useState('toutes') // toutes | a_venir | passees
   const [updatingId, setUpdatingId] = useState(null)
 
+  const exportCSV = () => {
+    const cols = ['Prénom', 'Nom', 'Email', 'Téléphone', 'Date', 'Heure', 'Couverts', 'Statut']
+    const rows = reservations.map((r) => [
+      r.prenom, r.nom, r.email, r.telephone || '',
+      r.date, r.heure?.slice(0, 5), r.nb_personnes, r.statut,
+    ])
+    const csv = [cols, ...rows]
+      .map((row) => row.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reservations-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   useEffect(() => {
     if (!user) return
     fetchReservations()
@@ -115,16 +133,29 @@ export default function Reservations() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-xl font-bold text-[#1a1a2e]">Réservations</h1>
-          <button
-            onClick={fetchReservations}
-            className="text-xs text-gray-400 hover:text-[#1a1a2e] flex items-center gap-1.5 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Actualiser
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={exportCSV}
+              disabled={reservations.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:border-[#1a1a2e] hover:text-[#1a1a2e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-white"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Exporter CSV
+            </button>
+            <button
+              onClick={fetchReservations}
+              className="text-xs text-gray-400 hover:text-[#1a1a2e] flex items-center gap-1.5 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Actualiser
+            </button>
+          </div>
         </div>
 
         {/* Filtres */}

@@ -57,6 +57,39 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'slug manquant' }), { status: 400, headers })
   }
 
+  // ── MODE DEMO — données fictives, aucune écriture en base ───────
+  if (slug === 'demo') {
+    if (req.method === 'GET') {
+      return new Response(JSON.stringify({
+        resto: {
+          id: 'demo',
+          nom: 'Le Comptoir Demo',
+          slug: 'demo',
+          adresse: '12 rue de la Paix, 13001 Marseille',
+          description: 'Restaurant fictif pour la démonstration de CERYDRA.',
+          nb_couverts_max: 30,
+          delai_minimum_heures: 2,
+          widget_primary_color: '#1a1a2e',
+          widget_bg_color: '#ffffff',
+          widget_button_text: 'Réserver',
+          widget_bg_image_url: '',
+        },
+        horaires: [
+          { jour: 'lundi',    ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'mardi',    ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'mercredi', ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'jeudi',    ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'vendredi', ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'samedi',   ouvert: true,  midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+          { jour: 'dimanche', ouvert: false, midi_debut: '12:00', midi_fin: '14:30', soir_debut: '19:00', soir_fin: '22:30' },
+        ],
+      }), { status: 200, headers })
+    }
+    if (req.method === 'POST') {
+      return new Response(JSON.stringify({ ok: true, demo: true }), { status: 201, headers })
+    }
+  }
+
   try {
     // ── GET : récupère restaurant + horaires ──────────────────────
     if (req.method === 'GET') {
