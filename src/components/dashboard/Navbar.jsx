@@ -20,9 +20,12 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
-      <div className="max-w-6xl mx-auto px-6 py-0 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link to="/"><Logo size="sm" /></Link>
+      {/* Ligne principale */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <Link to="/"><Logo size="sm" /></Link>
+
+        {/* Desktop : nav + email + logout */}
+        <div className="hidden sm:flex items-center gap-8 flex-1">
           <div className="flex">
             {navItems.map((item) => {
               const active = location.pathname === item.to
@@ -41,28 +44,60 @@ export default function Navbar() {
               )
             })}
           </div>
+          <div className="ml-auto flex items-center gap-4">
+            <span className="text-xs text-gray-400 hidden lg:block">{user?.email}</span>
+            {user?.email === 'contact@cerydra.fr' && (
+              <Link
+                to="/admin"
+                className={`text-xs font-medium transition-colors ${
+                  location.pathname === '/admin'
+                    ? 'text-[#1a1a2e]'
+                    : 'text-gray-400 hover:text-[#1a1a2e]'
+                }`}
+              >
+                Admin
+              </Link>
+            )}
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-gray-400 hover:text-[#1a1a2e] transition-colors"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-gray-400">{user?.email}</span>
-          {user?.email === 'contact@cerydra.fr' && (
+
+        {/* Mobile : logout icon uniquement */}
+        <button
+          onClick={handleSignOut}
+          className="sm:hidden p-2 text-gray-400 hover:text-[#1a1a2e] transition-colors"
+          aria-label="Déconnexion"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile : onglets défilables */}
+      <div className="sm:hidden flex border-t border-gray-50 overflow-x-auto scrollbar-none">
+        {navItems.map((item) => {
+          const active = location.pathname === item.to
+          return (
             <Link
-              to="/admin"
-              className={`text-xs font-medium transition-colors ${
-                location.pathname === '/admin'
-                  ? 'text-[#1a1a2e]'
-                  : 'text-gray-400 hover:text-[#1a1a2e]'
+              key={item.to}
+              to={item.to}
+              className={`flex-shrink-0 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                active
+                  ? 'border-[#1a1a2e] text-[#1a1a2e]'
+                  : 'border-transparent text-gray-400'
               }`}
             >
-              Admin
+              {item.label}
             </Link>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-gray-400 hover:text-[#1a1a2e] transition-colors"
-          >
-            Déconnexion
-          </button>
-        </div>
+          )
+        })}
       </div>
     </nav>
   )

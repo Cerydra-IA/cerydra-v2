@@ -239,9 +239,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6 gap-3">
           <div>
             <h1 className="text-xl font-bold text-[#1a1a2e]">
               {resto.nom || 'Mon restaurant'}
@@ -267,8 +267,8 @@ export default function Dashboard() {
 
           {/* — Informations générales — */}
           <SectionCard title="Informations générales" description="Ces informations apparaissent sur votre page publique de réservation.">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2">
                 <Field label="Nom du restaurant">
                   <input
                     className={inputCls}
@@ -279,7 +279,7 @@ export default function Dashboard() {
                 </Field>
               </div>
 
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <Field label="URL de réservation" hint="(slug — généré automatiquement)">
                   <div className="flex items-center rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#1a1a2e]/10 focus-within:border-[#1a1a2e] transition-colors overflow-hidden">
                     <span className="px-3.5 py-2.5 bg-gray-50 text-gray-400 text-sm border-r border-gray-200 whitespace-nowrap select-none">
@@ -313,7 +313,7 @@ export default function Dashboard() {
                 />
               </Field>
 
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <Field label="Description courte">
                   <textarea
                     className={`${inputCls} resize-none`}
@@ -329,7 +329,7 @@ export default function Dashboard() {
 
           {/* — Capacité & règles — */}
           <SectionCard title="Capacité & règles" description="Paramètres utilisés pour valider les réservations.">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Nombre de tables">
                 <input
                   type="number"
@@ -383,8 +383,46 @@ export default function Dashboard() {
 
           {/* — Horaires — */}
           <SectionCard title="Horaires d'ouverture" description="Les créneaux disponibles seront proposés toutes les 30 minutes.">
-            <div className="space-y-1">
-              {/* Header */}
+
+            {/* ── MOBILE : cartes ─────────────────────────────────── */}
+            <div className="flex flex-col gap-3 md:hidden">
+              {horaires.map((h) => (
+                <div key={h.jour} className={`rounded-xl border p-4 ${h.ouvert ? 'border-gray-100 bg-white' : 'border-gray-100 bg-gray-50'}`}>
+                  {/* Ligne jour + toggle */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-sm font-semibold capitalize ${h.ouvert ? 'text-[#1a1a2e]' : 'text-gray-300'}`}>
+                      {h.jour}
+                    </span>
+                    <ToggleJour ouvert={h.ouvert} onChange={(val) => handleHoraire(h.jour, 'ouvert', val)} />
+                  </div>
+                  {h.ouvert ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Midi début</p>
+                        <TimeInput value={h.midi_debut} onChange={(val) => handleHoraire(h.jour, 'midi_debut', val)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Midi fin</p>
+                        <TimeInput value={h.midi_fin} onChange={(val) => handleHoraire(h.jour, 'midi_fin', val)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Soir début</p>
+                        <TimeInput value={h.soir_debut} onChange={(val) => handleHoraire(h.jour, 'soir_debut', val)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Soir fin</p>
+                        <TimeInput value={h.soir_fin} onChange={(val) => handleHoraire(h.jour, 'soir_fin', val)} />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-300">Fermé ce jour</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── DESKTOP : tableau ───────────────────────────────── */}
+            <div className="hidden md:block space-y-1">
               <div className="grid items-center gap-3 pb-2 border-b border-gray-50 mb-3"
                 style={{ gridTemplateColumns: '90px 52px 1fr 1fr 1fr 1fr' }}>
                 <span className="text-xs text-gray-400 font-medium">Jour</span>
@@ -394,26 +432,18 @@ export default function Dashboard() {
                 <span className="text-xs text-gray-400 font-medium text-center">Soir début</span>
                 <span className="text-xs text-gray-400 font-medium text-center">Soir fin</span>
               </div>
-
               {horaires.map((h) => (
                 <div
                   key={h.jour}
-                  className={`grid items-center gap-3 py-2.5 px-3 rounded-xl transition-colors ${
-                    h.ouvert ? 'bg-white' : 'bg-gray-50'
-                  }`}
+                  className={`grid items-center gap-3 py-2.5 px-3 rounded-xl transition-colors ${h.ouvert ? 'bg-white' : 'bg-gray-50'}`}
                   style={{ gridTemplateColumns: '90px 52px 1fr 1fr 1fr 1fr' }}
                 >
                   <span className={`text-sm font-medium capitalize ${h.ouvert ? 'text-[#1a1a2e]' : 'text-gray-300'}`}>
                     {h.jour}
                   </span>
-
                   <div className="flex justify-center">
-                    <ToggleJour
-                      ouvert={h.ouvert}
-                      onChange={(val) => handleHoraire(h.jour, 'ouvert', val)}
-                    />
+                    <ToggleJour ouvert={h.ouvert} onChange={(val) => handleHoraire(h.jour, 'ouvert', val)} />
                   </div>
-
                   {h.ouvert ? (
                     <>
                       <TimeInput value={h.midi_debut} onChange={(val) => handleHoraire(h.jour, 'midi_debut', val)} />
