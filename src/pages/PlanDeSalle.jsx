@@ -78,9 +78,9 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
           {assignment.client_name}
         </span>
       )}
-      {assignment?.heure && (
+      {assignment?.notes && (
         <span style={{ color: s.text, fontSize: 9, opacity: 0.75 }}>
-          {assignment.heure}
+          {assignment.notes.split(' · ')[0]}
         </span>
       )}
     </div>
@@ -96,7 +96,7 @@ function BandeauAplacer({ reservations, onPlace }) {
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
         <p className="text-sm font-semibold text-amber-800">
-          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer aujourd'hui
+          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -108,7 +108,10 @@ function BandeauAplacer({ reservations, onPlace }) {
           >
             <span className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</span>
             <span className="text-gray-400">·</span>
-            <span className="text-amber-700 font-semibold">{formatHeure(r.heure)}</span>
+            <span className="text-amber-700 font-semibold">
+              {r.date !== today() && new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' '}
+              {formatHeure(r.heure)}
+            </span>
             <span className="text-gray-400">·</span>
             <span className="text-gray-500">{r.nb_personnes}p</span>
             <span className="text-amber-600 group-hover:text-amber-800 ml-1">→ placer</span>
@@ -145,7 +148,7 @@ function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
               <p className="text-xs text-gray-400">
                 {s.label}
                 {assignment?.client_name ? ` · ${assignment.client_name}` : ''}
-                {assignment?.heure ? ` · ${assignment.heure}` : ''}
+                {assignment?.notes ? ` · ${assignment.notes.split(' · ')[0]}` : ''}
               </p>
             </div>
           </div>
@@ -155,7 +158,7 @@ function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
             <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-0.5">
               <p className="font-medium text-[#1a1a2e]">{assignment.client_name}</p>
               {assignment.nb_persons && <p className="text-gray-500 text-xs">{assignment.nb_persons} personnes</p>}
-              {assignment.heure && <p className="text-gray-400 text-xs">Réservation à {assignment.heure}</p>}
+              {assignment.notes && <p className="text-gray-400 text-xs">Réservation à {assignment.notes.split(' · ')[0]}</p>}
               {assignment.notes && <p className="text-gray-400 text-xs italic">{assignment.notes}</p>}
             </div>
           )}
@@ -486,8 +489,9 @@ export default function PlanDeSalle() {
       supabase.from('reservations')
         .select('*')
         .eq('restaurant_id', resto.id)
-        .eq('date', today())
+        .gte('date', today())
         .in('statut', ['confirmée', 'en_attente'])
+        .order('date')
         .order('heure'),
     ])
 
@@ -578,8 +582,7 @@ export default function PlanDeSalle() {
       reservation_id: resa.id,
       client_name: `${resa.prenom} ${resa.nom}`,
       nb_persons: resa.nb_personnes,
-      notes: resa.message || null,
-      heure: formatHeure(resa.heure),
+      notes: `${formatHeure(resa.heure)}${resa.message ? ' · ' + resa.message : ''}` || null,
       status: 'reservee',
       duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
