@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/dashboard/Navbar'
 import SectionCard from '../components/dashboard/SectionCard'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const STATUTS = {
   en_attente: { label: 'En attente', bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400' },
@@ -31,8 +32,11 @@ export default function Reservations() {
   const [reservations, setReservations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filtre, setFiltre] = useState('toutes') // toutes | a_venir | passees
+  const [filtre, setFiltre] = useState('toutes')
   const [updatingId, setUpdatingId] = useState(null)
+  const [restoId, setRestoId] = useState(null)
+
+  usePushNotifications(user, restoId)
 
   const exportCSV = () => {
     const cols = ['Prénom', 'Nom', 'Email', 'Téléphone', 'Date', 'Heure', 'Couverts', 'Statut']
@@ -73,6 +77,7 @@ export default function Reservations() {
       setLoading(false)
       return
     }
+    setRestoId(resto.id)
 
     // 2. Récupère les réservations
     const { data, error: resaErr } = await supabase
