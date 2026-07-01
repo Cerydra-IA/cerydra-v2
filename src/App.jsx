@@ -7,6 +7,7 @@ import Connexion from './pages/Connexion'
 import Dashboard from './pages/Dashboard'
 import Reservations from './pages/Reservations'
 import Statistiques from './pages/Statistiques'
+import PlanDeSalle from './pages/PlanDeSalle'
 import RestoPublic from './pages/RestoPublic'
 import Annuler from './pages/Annuler'
 import Admin from './pages/Admin'
@@ -42,6 +43,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Reservations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/plan"
+            element={
+              <ProtectedRoute>
+                <PlanDeSalle />
               </ProtectedRoute>
             }
           />
