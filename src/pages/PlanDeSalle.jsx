@@ -6,26 +6,22 @@ import Navbar from '../components/dashboard/Navbar'
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const STATUS = {
-  libre:    { label: 'Libre',     bg: '#22c55e', text: '#fff', ring: '#16a34a' },
-  reservee: { label: 'Réservée',  bg: '#f59e0b', text: '#fff', ring: '#d97706' },
-  occupee:  { label: 'Occupée',   bg: '#ef4444', text: '#fff', ring: '#dc2626' },
-  bloquee:  { label: 'Bloquée',   bg: '#9ca3af', text: '#fff', ring: '#6b7280' },
+  libre:    { label: 'Libre',    bg: '#22c55e', text: '#fff', ring: '#16a34a' },
+  reservee: { label: 'Réservée', bg: '#f59e0b', text: '#fff', ring: '#d97706' },
+  occupee:  { label: 'Occupée',  bg: '#ef4444', text: '#fff', ring: '#dc2626' },
+  bloquee:  { label: 'Bloquée',  bg: '#9ca3af', text: '#fff', ring: '#6b7280' },
 }
 
-const TABLE_DEFAULT_DURATION = 90 // minutes
-const CANVAS_H = 480 // px, fixed height for the plan
+const TABLE_DEFAULT_DURATION = 90
+const CANVAS_H = 480
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
-function isMobile() {
-  return window.innerWidth < 768
-}
+function formatHeure(h) { return h?.slice(0, 5) || '' }
 
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v))
-}
+function today() { return new Date().toISOString().split('T')[0] }
 
-// ─── Sous-composants ─────────────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────────
 
 function Toast({ message, type }) {
   if (!message) return null
@@ -38,10 +34,11 @@ function Toast({ message, type }) {
   )
 }
 
-// Icône table pour le plan
+// ─── TableShape ───────────────────────────────────────────────────────────────
+
 function TableShape({ table, assignment, selected, onTap, onDragStart, configMode }) {
   const s = STATUS[assignment?.status || 'libre']
-  const isActive = selected
+  const sz = table.capacity <= 2 ? 52 : table.capacity <= 4 ? 64 : 78
 
   return (
     <div
@@ -53,20 +50,17 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
         left: `${table.x_pct}%`,
         top: `${table.y_pct}%`,
         transform: 'translate(-50%, -50%)',
-        width: table.capacity <= 2 ? 52 : table.capacity <= 4 ? 64 : 78,
-        height: table.capacity <= 2 ? 52 : table.capacity <= 4 ? 64 : 78,
+        width: sz, height: sz,
         backgroundColor: s.bg,
-        border: `3px solid ${isActive ? '#1a6bff' : s.ring}`,
+        border: `3px solid ${selected ? '#1a6bff' : s.ring}`,
         borderRadius: table.shape === 'round' ? '50%' : '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
         cursor: configMode ? 'grab' : 'pointer',
         userSelect: 'none',
-        boxShadow: isActive ? '0 0 0 3px #1a6bff44' : '0 2px 8px rgba(0,0,0,0.15)',
+        boxShadow: selected ? '0 0 0 3px #1a6bff44' : '0 2px 8px rgba(0,0,0,0.15)',
         transition: 'box-shadow 0.15s, border-color 0.15s',
-        zIndex: isActive ? 10 : 1,
+        zIndex: selected ? 10 : 1,
       }}
     >
       <span style={{ color: s.text, fontWeight: 700, fontSize: 13, lineHeight: 1 }}>
@@ -76,20 +70,65 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
         {table.capacity}p
       </span>
       {assignment?.client_name && (
-        <span style={{ color: s.text, fontSize: 9, opacity: 0.8, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+        <span style={{
+          color: s.text, fontSize: 9, opacity: 0.85,
+          maxWidth: sz - 8, overflow: 'hidden',
+          textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+        }}>
           {assignment.client_name}
+        </span>
+      )}
+      {assignment?.heure && (
+        <span style={{ color: s.text, fontSize: 9, opacity: 0.75 }}>
+          {assignment.heure}
         </span>
       )}
     </div>
   )
 }
 
-// Modal d'action en mode service
-function ServiceModal({ table, assignment, onClose, onAction }) {
+// ─── Bandeau réservations à placer ───────────────────────────────────────────
+
+function BandeauAplacer({ reservations, onPlace }) {
+  if (!reservations.length) return null
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+        <p className="text-sm font-semibold text-amber-800">
+          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer aujourd'hui
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {reservations.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onPlace(r)}
+            className="flex items-center gap-2 bg-white border border-amber-200 hover:border-amber-400 rounded-xl px-3 py-2 text-xs transition-colors group"
+          >
+            <span className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-amber-700 font-semibold">{formatHeure(r.heure)}</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-500">{r.nb_personnes}p</span>
+            <span className="text-amber-600 group-hover:text-amber-800 ml-1">→ placer</span>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-amber-600 mt-2">
+        Cliquez sur une réservation, puis tapez la table sur le plan pour l'y assigner.
+      </p>
+    </div>
+  )
+}
+
+// ─── Modal service ────────────────────────────────────────────────────────────
+
+function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
   const s = STATUS[assignment?.status || 'libre']
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
       <div
         className="relative w-full sm:max-w-sm bg-white sm:rounded-2xl rounded-t-3xl shadow-xl overflow-hidden"
@@ -103,48 +142,78 @@ function ServiceModal({ table, assignment, onClose, onAction }) {
             </div>
             <div>
               <p className="font-semibold text-[#1a1a2e]">{table.name} — {table.capacity} personnes</p>
-              <p className="text-xs text-gray-400">{s.label}{assignment?.client_name ? ` · ${assignment.client_name}` : ''}</p>
+              <p className="text-xs text-gray-400">
+                {s.label}
+                {assignment?.client_name ? ` · ${assignment.client_name}` : ''}
+                {assignment?.heure ? ` · ${assignment.heure}` : ''}
+              </p>
             </div>
           </div>
+
+          {/* Info client actuel */}
           {assignment?.client_name && (
-            <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 text-sm">
+            <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-0.5">
               <p className="font-medium text-[#1a1a2e]">{assignment.client_name}</p>
-              {assignment.nb_persons && <p className="text-gray-500 text-xs mt-0.5">{assignment.nb_persons} personnes</p>}
-              {assignment.notes && <p className="text-gray-400 text-xs mt-0.5 italic">{assignment.notes}</p>}
+              {assignment.nb_persons && <p className="text-gray-500 text-xs">{assignment.nb_persons} personnes</p>}
+              {assignment.heure && <p className="text-gray-400 text-xs">Réservation à {assignment.heure}</p>}
+              {assignment.notes && <p className="text-gray-400 text-xs italic">{assignment.notes}</p>}
+            </div>
+          )}
+
+          {/* Réservation en attente de placement sur cette table */}
+          {pendingResa && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-amber-800 mb-1">Réservation à placer ici :</p>
+              <p className="text-sm font-medium text-[#1a1a2e]">{pendingResa.prenom} {pendingResa.nom}</p>
+              <p className="text-xs text-amber-700">{formatHeure(pendingResa.heure)} · {pendingResa.nb_personnes} personnes</p>
+              <button
+                onClick={() => onAction('link_resa', pendingResa)}
+                className="mt-2 w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-colors"
+              >
+                Confirmer l'assignation
+              </button>
             </div>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="p-4 space-y-2">
-          {['libre', 'reservee', 'occupee', 'bloquee'].map((st) => {
-            const info = STATUS[st]
+        {/* Changement de statut */}
+        <div className="p-4 space-y-1.5">
+          <p className="text-xs font-medium text-gray-400 mb-2 px-1">Changer le statut</p>
+          {Object.entries(STATUS).map(([st, info]) => {
             const isCurrent = (assignment?.status || 'libre') === st
             return (
               <button
                 key={st}
                 onClick={() => onAction('status', st)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  isCurrent ? 'ring-2 ring-offset-1' : 'hover:bg-gray-50'
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isCurrent ? 'bg-gray-100' : 'hover:bg-gray-50'
                 }`}
-                style={isCurrent ? { ringColor: info.ring } : {}}
               >
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: info.bg }} />
-                <span className="text-[#1a1a2e]">Marquer {info.label.toLowerCase()}</span>
+                <span className="text-[#1a1a2e]">{info.label}</span>
                 {isCurrent && <span className="ml-auto text-xs text-gray-400">actuel</span>}
               </button>
             )
           })}
 
-          <div className="border-t border-gray-100 pt-2 mt-2">
+          <div className="border-t border-gray-100 pt-2 mt-2 space-y-1">
             <button
               onClick={() => onAction('assign')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[#1a6bff] hover:bg-blue-50 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[#1a6bff] hover:bg-blue-50 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              Assigner un client
+              Assigner un client walk-in
+            </button>
+            <button
+              onClick={() => onAction('choose_resa')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Lier à une réservation en ligne
             </button>
           </div>
         </div>
@@ -159,7 +228,64 @@ function ServiceModal({ table, assignment, onClose, onAction }) {
   )
 }
 
-// Modal d'assignation client
+// ─── Modal : choisir une réservation à lier ───────────────────────────────────
+
+function ChooseResaModal({ table, reservationsNonPlacees, onClose, onLink }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative w-full sm:max-w-sm bg-white sm:rounded-2xl rounded-t-3xl shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+          <p className="font-semibold text-[#1a1a2e]">Lier une réservation à {table.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Réservations du jour sans table assignée</p>
+        </div>
+
+        <div className="p-4 max-h-80 overflow-y-auto">
+          {reservationsNonPlacees.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              Aucune réservation en attente de placement aujourd'hui.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {reservationsNonPlacees.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => onLink(r)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-amber-300 hover:bg-amber-50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-amber-700 font-bold text-sm">{formatHeure(r.heure)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#1a1a2e] text-sm">{r.prenom} {r.nom}</p>
+                    <p className="text-xs text-gray-400">{r.nb_personnes} personnes{r.message ? ` · ${r.message}` : ''}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    r.statut === 'confirmée' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
+                  }`}>
+                    {r.statut === 'confirmée' ? 'Confirmée' : 'En attente'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal walk-in ────────────────────────────────────────────────────────────
+
 function AssignModal({ table, onClose, onSave }) {
   const [form, setForm] = useState({ client_name: '', nb_persons: table?.capacity || 2, notes: '' })
 
@@ -171,8 +297,8 @@ function AssignModal({ table, onClose, onSave }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-          <p className="font-semibold text-[#1a1a2e]">Assigner à {table?.name}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Client en salle sans réservation en ligne</p>
+          <p className="font-semibold text-[#1a1a2e]">Client walk-in — {table?.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Client sans réservation en ligne</p>
         </div>
         <div className="p-5 space-y-4">
           <div>
@@ -188,9 +314,7 @@ function AssignModal({ table, onClose, onSave }) {
           <div>
             <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Nombre de personnes</label>
             <input
-              type="number"
-              min={1}
-              max={20}
+              type="number" min={1} max={20}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition-colors"
               value={form.nb_persons}
               onChange={(e) => setForm((f) => ({ ...f, nb_persons: Number(e.target.value) }))}
@@ -206,8 +330,8 @@ function AssignModal({ table, onClose, onSave }) {
             />
           </div>
           <button
-            onClick={() => onSave(form)}
-            className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors"
+            onClick={() => form.client_name.trim() && onSave(form)}
+            className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50"
           >
             Assigner et marquer Occupée
           </button>
@@ -222,7 +346,8 @@ function AssignModal({ table, onClose, onSave }) {
   )
 }
 
-// Modal d'édition d'une table (mode config)
+// ─── Modal édition table (config) ─────────────────────────────────────────────
+
 function EditTableModal({ table, onClose, onSave, onDelete }) {
   const [form, setForm] = useState({
     name: table.name,
@@ -252,11 +377,9 @@ function EditTableModal({ table, onClose, onSave, onDelete }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Capacité (personnes)</label>
+            <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Capacité</label>
             <input
-              type="number"
-              min={1}
-              max={20}
+              type="number" min={1} max={20}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition-colors"
               value={form.capacity}
               onChange={(e) => setForm((f) => ({ ...f, capacity: Number(e.target.value) }))}
@@ -266,16 +389,12 @@ function EditTableModal({ table, onClose, onSave, onDelete }) {
             <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Forme</label>
             <div className="flex gap-2">
               {[['round', 'Ronde'], ['rect', 'Rectangulaire']].map(([v, l]) => (
-                <button
-                  key={v}
-                  type="button"
+                <button key={v} type="button"
                   onClick={() => setForm((f) => ({ ...f, shape: v }))}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
                     form.shape === v ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                   }`}
-                >
-                  {l}
-                </button>
+                >{l}</button>
               ))}
             </div>
           </div>
@@ -287,7 +406,7 @@ function EditTableModal({ table, onClose, onSave, onDelete }) {
               onChange={(e) => setForm((f) => ({ ...f, duration_minutes: Number(e.target.value) }))}
             >
               {[60, 75, 90, 105, 120, 150, 180].map((m) => (
-                <option key={m} value={m}>{m} min ({Math.floor(m / 60)}h{m % 60 ? String(m % 60).padStart(2, '0') : ''})</option>
+                <option key={m} value={m}>{m} min</option>
               ))}
             </select>
           </div>
@@ -322,23 +441,28 @@ export default function PlanDeSalle() {
   const { user } = useAuth()
   const [restoId, setRestoId] = useState(null)
   const [tables, setTables] = useState([])
-  const [assignments, setAssignments] = useState({}) // table_id → assignment
+  const [assignments, setAssignments] = useState({})     // table_id → assignment
+  const [reservations, setReservations] = useState([])   // réservations du jour
   const [zone, setZone] = useState('salle')
   const [configMode, setConfigMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState({ message: '', type: 'success' })
 
-  // Modals
-  const [serviceModal, setServiceModal] = useState(null) // table
-  const [assignModal, setAssignModal] = useState(null)   // table
-  const [editModal, setEditModal] = useState(null)       // table
+  // Sélection en cours dans le bandeau (réservation à placer)
+  const [resaEnCours, setResaEnCours] = useState(null)
 
-  // Drag & drop config mode
-  const dragging = useRef(null) // { tableId, startX, startY, origX, origY }
+  // Modals
+  const [serviceModal, setServiceModal] = useState(null)
+  const [assignModal, setAssignModal] = useState(null)
+  const [editModal, setEditModal] = useState(null)
+  const [chooseResaModal, setChooseResaModal] = useState(null)
+
+  // Drag & drop
+  const dragging = useRef(null)
   const canvasRef = useRef(null)
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type })
+  const showToast = (msg, type = 'success') => {
+    setToast({ message: msg, type })
     setTimeout(() => setToast({ message: '', type: 'success' }), 3000)
   }
 
@@ -352,26 +476,26 @@ export default function PlanDeSalle() {
   const loadAll = async () => {
     setLoading(true)
     const { data: resto } = await supabase
-      .from('restaurants')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
+      .from('restaurants').select('id').eq('user_id', user.id).single()
     if (!resto) { setLoading(false); return }
     setRestoId(resto.id)
 
-    const [{ data: tablesData }, { data: assignData }] = await Promise.all([
+    const [{ data: tablesData }, { data: assignData }, { data: resaData }] = await Promise.all([
       supabase.from('plan_tables').select('*').eq('restaurant_id', resto.id).order('name'),
       supabase.from('table_assignments').select('*').eq('restaurant_id', resto.id),
+      supabase.from('reservations')
+        .select('*')
+        .eq('restaurant_id', resto.id)
+        .eq('date', today())
+        .in('statut', ['confirmée', 'en_attente'])
+        .order('heure'),
     ])
 
     setTables(tablesData || [])
+    setReservations(resaData || [])
 
-    // Map assignments par table_id (on prend le plus récent actif)
     const map = {}
-    for (const a of assignData || []) {
-      map[a.table_id] = a
-    }
+    for (const a of assignData || []) map[a.table_id] = a
     setAssignments(map)
     setLoading(false)
   }
@@ -383,22 +507,23 @@ export default function PlanDeSalle() {
     const channel = supabase
       .channel('plan-realtime')
       .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'table_assignments',
+        event: '*', schema: 'public', table: 'table_assignments',
         filter: `restaurant_id=eq.${restoId}`,
       }, (payload) => {
         if (payload.eventType === 'DELETE') {
-          setAssignments((prev) => {
-            const next = { ...prev }
-            delete next[payload.old.table_id]
-            return next
-          })
+          setAssignments((prev) => { const n = { ...prev }; delete n[payload.old.table_id]; return n })
         } else {
-          setAssignments((prev) => ({
-            ...prev,
-            [payload.new.table_id]: payload.new,
-          }))
+          setAssignments((prev) => ({ ...prev, [payload.new.table_id]: payload.new }))
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'reservations',
+        filter: `restaurant_id=eq.${restoId}`,
+      }, (payload) => {
+        // Nouvelle réservation reçue en temps réel
+        const r = payload.new
+        if (r.date === today() && ['confirmée', 'en_attente'].includes(r.statut)) {
+          setReservations((prev) => [...prev, r].sort((a, b) => a.heure.localeCompare(b.heure)))
         }
       })
       .subscribe()
@@ -406,7 +531,7 @@ export default function PlanDeSalle() {
     return () => { supabase.removeChannel(channel) }
   }, [restoId])
 
-  // ── Drag & drop (mode config) ────────────────────────────────────────────────
+  // ── Drag & drop ─────────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback((e, tableId) => {
     if (!configMode) return
@@ -416,12 +541,9 @@ export default function PlanDeSalle() {
     const table = tables.find((t) => t.id === tableId)
     dragging.current = {
       tableId,
-      startX: e.clientX,
-      startY: e.clientY,
-      origXPct: table.x_pct,
-      origYPct: table.y_pct,
-      canvasW: rect.width,
-      canvasH: rect.height,
+      startX: e.clientX, startY: e.clientY,
+      origXPct: table.x_pct, origYPct: table.y_pct,
+      canvasW: rect.width, canvasH: rect.height,
     }
     e.preventDefault()
   }, [configMode, tables])
@@ -430,104 +552,35 @@ export default function PlanDeSalle() {
     const onMove = (e) => {
       if (!dragging.current) return
       const { tableId, startX, startY, origXPct, origYPct, canvasW, canvasH } = dragging.current
-      const dx = e.clientX - startX
-      const dy = e.clientY - startY
-      const newX = clamp(origXPct + (dx / canvasW) * 100, 5, 95)
-      const newY = clamp(origYPct + (dy / canvasH) * 100, 5, 95)
+      const newX = clamp(origXPct + ((e.clientX - startX) / canvasW) * 100, 5, 95)
+      const newY = clamp(origYPct + ((e.clientY - startY) / canvasH) * 100, 5, 95)
       setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, x_pct: newX, y_pct: newY } : t))
     }
-
     const onUp = async () => {
       if (!dragging.current) return
       const { tableId } = dragging.current
       const table = tables.find((t) => t.id === tableId)
       dragging.current = null
-      if (table) {
-        await supabase.from('plan_tables').update({ x_pct: table.x_pct, y_pct: table.y_pct }).eq('id', tableId)
-      }
+      if (table) await supabase.from('plan_tables').update({ x_pct: table.x_pct, y_pct: table.y_pct }).eq('id', tableId)
     }
-
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [tables])
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Lier une réservation à une table ────────────────────────────────────────
 
-  const addTable = async () => {
-    const existing = tables.filter((t) => t.zone === zone)
-    const name = `T${tables.length + 1}`
-    const x = 20 + (existing.length % 5) * 18
-    const y = 25 + Math.floor(existing.length / 5) * 35
-
-    const { data, error } = await supabase.from('plan_tables').insert({
-      restaurant_id: restoId,
-      name,
-      capacity: 4,
-      shape: 'round',
-      zone,
-      x_pct: x,
-      y_pct: y,
-      duration_minutes: TABLE_DEFAULT_DURATION,
-    }).select().single()
-
-    if (!error && data) {
-      setTables((prev) => [...prev, data])
-      showToast(`Table ${name} ajoutée`)
-    }
-  }
-
-  const handleServiceAction = async (action, value) => {
-    const table = serviceModal
-    if (!table) return
-
-    if (action === 'assign') {
-      setServiceModal(null)
-      setAssignModal(table)
-      return
-    }
-
-    if (action === 'status') {
-      const existing = assignments[table.id]
-      if (existing) {
-        const { error } = await supabase
-          .from('table_assignments')
-          .update({ status: value, client_name: value === 'libre' ? null : existing.client_name, nb_persons: value === 'libre' ? null : existing.nb_persons })
-          .eq('id', existing.id)
-        if (!error) {
-          setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, status: value } }))
-        }
-      } else {
-        const { data, error } = await supabase.from('table_assignments').insert({
-          restaurant_id: restoId,
-          table_id: table.id,
-          status: value,
-        }).select().single()
-        if (!error && data) {
-          setAssignments((prev) => ({ ...prev, [table.id]: data }))
-        }
-      }
-      setServiceModal(null)
-      showToast(`${table.name} → ${STATUS[value].label}`)
-    }
-  }
-
-  const handleAssignSave = async (form) => {
-    const table = assignModal
-    if (!table) return
+  const linkResaToTable = async (table, resa) => {
     const existing = assignments[table.id]
-
     const payload = {
       restaurant_id: restoId,
       table_id: table.id,
-      client_name: form.client_name,
-      nb_persons: form.nb_persons,
-      notes: form.notes,
-      status: 'occupee',
-      started_at: new Date().toISOString(),
+      reservation_id: resa.id,
+      client_name: `${resa.prenom} ${resa.nom}`,
+      nb_persons: resa.nb_personnes,
+      notes: resa.message || null,
+      heure: formatHeure(resa.heure),
+      status: 'reservee',
       duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
 
@@ -539,25 +592,113 @@ export default function PlanDeSalle() {
       if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
     }
 
+    setResaEnCours(null)
+    showToast(`${table.name} assignée à ${resa.prenom} ${resa.nom}`)
+  }
+
+  // ── Tap sur une table (mode service) ────────────────────────────────────────
+
+  const handleTableTap = (table) => {
+    if (configMode) return
+    // Si une réservation est en cours de placement, on propose directement
+    if (resaEnCours) {
+      setServiceModal({ ...table, _pendingResa: resaEnCours })
+    } else {
+      setServiceModal(table)
+    }
+  }
+
+  // ── Action depuis ServiceModal ───────────────────────────────────────────────
+
+  const handleServiceAction = async (action, value) => {
+    const table = serviceModal
+    if (!table) return
+
+    if (action === 'assign') {
+      setServiceModal(null)
+      setAssignModal(table)
+      return
+    }
+
+    if (action === 'choose_resa') {
+      setServiceModal(null)
+      setChooseResaModal(table)
+      return
+    }
+
+    if (action === 'link_resa') {
+      setServiceModal(null)
+      await linkResaToTable(table, value)
+      return
+    }
+
+    if (action === 'status') {
+      const existing = assignments[table.id]
+      const update = { status: value }
+      if (value === 'libre') {
+        update.client_name = null
+        update.nb_persons = null
+        update.reservation_id = null
+        update.heure = null
+        update.notes = null
+      }
+
+      if (existing) {
+        const { error } = await supabase.from('table_assignments').update(update).eq('id', existing.id)
+        if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...update } }))
+      } else {
+        const { data, error } = await supabase.from('table_assignments').insert({
+          restaurant_id: restoId, table_id: table.id, ...update,
+        }).select().single()
+        if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
+      }
+
+      setServiceModal(null)
+      showToast(`${table.name} → ${STATUS[value].label}`)
+    }
+  }
+
+  // ── Walk-in save ────────────────────────────────────────────────────────────
+
+  const handleAssignSave = async (form) => {
+    const table = assignModal
+    if (!table) return
+    const existing = assignments[table.id]
+    const payload = {
+      restaurant_id: restoId,
+      table_id: table.id,
+      client_name: form.client_name,
+      nb_persons: form.nb_persons,
+      notes: form.notes,
+      status: 'occupee',
+      started_at: new Date().toISOString(),
+      duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
+    }
+    if (existing) {
+      const { error } = await supabase.from('table_assignments').update(payload).eq('id', existing.id)
+      if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...payload } }))
+    } else {
+      const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
+      if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
+    }
     setAssignModal(null)
     showToast(`${table.name} assignée à ${form.client_name}`)
   }
+
+  // ── Edit table config ────────────────────────────────────────────────────────
 
   const handleEditSave = async (form) => {
     const table = editModal
     if (!table) return
     const { error } = await supabase.from('plan_tables').update(form).eq('id', table.id)
-    if (!error) {
-      setTables((prev) => prev.map((t) => t.id === table.id ? { ...t, ...form } : t))
-      showToast(`${form.name} mis à jour`)
-    }
+    if (!error) setTables((prev) => prev.map((t) => t.id === table.id ? { ...t, ...form } : t))
     setEditModal(null)
+    showToast(`${form.name} mis à jour`)
   }
 
   const handleEditDelete = async () => {
     const table = editModal
-    if (!table) return
-    if (!window.confirm(`Supprimer ${table.name} définitivement ?`)) return
+    if (!table || !window.confirm(`Supprimer ${table.name} définitivement ?`)) return
     await supabase.from('plan_tables').delete().eq('id', table.id)
     await supabase.from('table_assignments').delete().eq('table_id', table.id)
     setTables((prev) => prev.filter((t) => t.id !== table.id))
@@ -566,15 +707,39 @@ export default function PlanDeSalle() {
     showToast(`${table.name} supprimée`)
   }
 
+  // ── Ajouter table ────────────────────────────────────────────────────────────
+
+  const addTable = async () => {
+    const existing = tables.filter((t) => t.zone === zone)
+    const name = `T${tables.length + 1}`
+    const x = 20 + (existing.length % 5) * 18
+    const y = 25 + Math.floor(existing.length / 5) * 35
+    const { data, error } = await supabase.from('plan_tables').insert({
+      restaurant_id: restoId, name, capacity: 4, shape: 'round',
+      zone, x_pct: x, y_pct: y, duration_minutes: TABLE_DEFAULT_DURATION,
+    }).select().single()
+    if (!error && data) {
+      setTables((prev) => [...prev, data])
+      showToast(`Table ${name} ajoutée`)
+    }
+  }
+
+  // ── Réservations non encore placées ─────────────────────────────────────────
+
+  // IDs des réservations déjà liées à une table
+  const resaDejaPlacees = new Set(
+    Object.values(assignments).map((a) => a.reservation_id).filter(Boolean)
+  )
+  const resasNonPlacees = reservations.filter((r) => !resaDejaPlacees.has(r.id))
+
   // ── Rendu ────────────────────────────────────────────────────────────────────
 
   const visibleTables = tables.filter((t) => t.zone === zone)
-
   const counts = {
-    libre: visibleTables.filter((t) => !assignments[t.id] || assignments[t.id].status === 'libre').length,
+    libre:    visibleTables.filter((t) => !assignments[t.id] || assignments[t.id].status === 'libre').length,
     reservee: visibleTables.filter((t) => assignments[t.id]?.status === 'reservee').length,
-    occupee: visibleTables.filter((t) => assignments[t.id]?.status === 'occupee').length,
-    bloquee: visibleTables.filter((t) => assignments[t.id]?.status === 'bloquee').length,
+    occupee:  visibleTables.filter((t) => assignments[t.id]?.status === 'occupee').length,
+    bloquee:  visibleTables.filter((t) => assignments[t.id]?.status === 'bloquee').length,
   }
 
   if (loading) {
@@ -607,16 +772,18 @@ export default function PlanDeSalle() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-          <h1 className="text-xl font-bold text-[#1a1a2e]">Plan de salle</h1>
+          <div>
+            <h1 className="text-xl font-bold text-[#1a1a2e]">Plan de salle</h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Mode config (desktop uniquement) */}
             <div className="hidden md:flex items-center gap-2">
               <button
                 onClick={() => setConfigMode((v) => !v)}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium border transition-colors ${
-                  configMode
-                    ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a1a2e]'
+                  configMode ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a1a2e]'
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -637,8 +804,6 @@ export default function PlanDeSalle() {
                 </button>
               )}
             </div>
-
-            {/* Actualiser */}
             <button
               onClick={loadAll}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-[#1a1a2e] bg-white border border-gray-200 hover:border-gray-300 transition-colors"
@@ -652,7 +817,37 @@ export default function PlanDeSalle() {
           </div>
         </div>
 
-        {/* Stats rapides */}
+        {/* Bandeau réservations à placer */}
+        {!configMode && (
+          <BandeauAplacer
+            reservations={resasNonPlacees}
+            onPlace={(r) => {
+              setResaEnCours((prev) => prev?.id === r.id ? null : r)
+            }}
+          />
+        )}
+
+        {/* Indicateur de sélection active */}
+        {resaEnCours && (
+          <div className="bg-[#1a1a2e] text-white rounded-2xl px-4 py-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <p className="text-sm font-medium">
+                Placement en cours : <strong>{resaEnCours.prenom} {resaEnCours.nom}</strong> · {formatHeure(resaEnCours.heure)} · {resaEnCours.nb_personnes}p
+              </p>
+            </div>
+            <button
+              onClick={() => setResaEnCours(null)}
+              className="text-gray-400 hover:text-white transition-colors ml-3"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Stats */}
         <div className="flex gap-3 mb-5 flex-wrap">
           {Object.entries(counts).map(([st, n]) => {
             const info = STATUS[st]
@@ -664,6 +859,13 @@ export default function PlanDeSalle() {
               </div>
             )
           })}
+          {resasNonPlacees.length > 0 && !configMode && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+              <span className="text-xs font-medium text-amber-800">{resasNonPlacees.length}</span>
+              <span className="text-xs text-amber-600">à placer</span>
+            </div>
+          )}
         </div>
 
         {/* Zone toggle */}
@@ -686,18 +888,19 @@ export default function PlanDeSalle() {
           ))}
         </div>
 
-        {/* Canvas du plan */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden relative"
-          style={{ minHeight: CANVAS_H }}>
-
-          {/* Légende mode config */}
+        {/* Canvas */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           {configMode && (
-            <div className="absolute top-3 left-3 z-20 bg-white/90 backdrop-blur-sm border border-gray-100 rounded-xl px-3 py-2 text-xs text-gray-500 shadow-sm">
-              Glissez les tables pour les repositionner · Clic pour modifier
+            <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
+              Mode configuration — Glissez les tables · Double-clic pour modifier
+            </div>
+          )}
+          {resaEnCours && (
+            <div className="px-4 py-2 bg-[#1a1a2e]/5 border-b border-[#1a1a2e]/10 text-xs text-[#1a1a2e] font-medium">
+              Tapez une table pour y placer {resaEnCours.prenom} {resaEnCours.nom}
             </div>
           )}
 
-          {/* Canvas */}
           <div
             ref={canvasRef}
             className="relative w-full"
@@ -711,21 +914,12 @@ export default function PlanDeSalle() {
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center">
                   <svg className="w-7 h-7 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M3 10h18M3 14h18M10 3v18M14 3v18" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18M10 3v18M14 3v18" />
                   </svg>
                 </div>
                 <p className="text-gray-400 text-sm">
-                  {configMode ? 'Cliquez sur "Ajouter une table" pour commencer' : 'Aucune table configurée pour cette zone'}
+                  {configMode ? 'Cliquez sur "Ajouter une table" pour commencer' : 'Aucune table dans cette zone'}
                 </p>
-                {configMode && (
-                  <button
-                    onClick={addTable}
-                    className="px-4 py-2 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors"
-                  >
-                    + Ajouter une table
-                  </button>
-                )}
               </div>
             )}
 
@@ -736,22 +930,16 @@ export default function PlanDeSalle() {
                 assignment={assignments[table.id]}
                 selected={editModal?.id === table.id}
                 configMode={configMode}
-                onTap={() => {
-                  if (!configMode) setServiceModal(table)
-                }}
+                onTap={() => handleTableTap(table)}
                 onDragStart={(e) => {
-                  if (e.detail === 2) {
-                    // double-clic en mode config → éditer
-                    setEditModal(table)
-                    return
-                  }
+                  if (e.detail === 2) { setEditModal(table); return }
                   handleDragStart(e, table.id)
                 }}
               />
             ))}
           </div>
 
-          {/* Légende couleurs */}
+          {/* Légende */}
           <div className="border-t border-gray-50 px-5 py-3 flex items-center gap-4 flex-wrap">
             {Object.entries(STATUS).map(([st, info]) => (
               <span key={st} className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -759,13 +947,10 @@ export default function PlanDeSalle() {
                 {info.label}
               </span>
             ))}
-            {configMode && (
-              <span className="ml-auto text-xs text-gray-400">Double-clic pour modifier une table</span>
-            )}
           </div>
         </div>
 
-        {/* Mobile : bouton config + ajouter */}
+        {/* Mobile : boutons config */}
         <div className="md:hidden mt-4 flex gap-2">
           <button
             onClick={() => setConfigMode((v) => !v)}
@@ -773,32 +958,17 @@ export default function PlanDeSalle() {
               configMode ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'bg-white text-gray-600 border-gray-200'
             }`}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            </svg>
-            {configMode ? 'Quitter config' : 'Configurer le plan'}
+            {configMode ? 'Quitter configuration' : 'Configurer le plan'}
           </button>
           {configMode && (
             <button
               onClick={addTable}
               className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-medium bg-[#1a6bff] text-white hover:bg-[#1a5ce8] transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Ajouter
+              + Ajouter
             </button>
           )}
         </div>
-
-        {/* SQL info (en config, admin) */}
-        {configMode && tables.length === 0 && (
-          <div className="mt-4 bg-amber-50 border border-amber-100 text-amber-700 text-xs px-4 py-3 rounded-xl">
-            <strong>À faire une fois dans Supabase :</strong> créez les tables <code>plan_tables</code> et <code>table_assignments</code>.
-            Copiez le SQL depuis la documentation de configuration.
-          </div>
-        )}
       </div>
 
       {/* Modals */}
@@ -806,7 +976,8 @@ export default function PlanDeSalle() {
         <ServiceModal
           table={serviceModal}
           assignment={assignments[serviceModal.id]}
-          onClose={() => setServiceModal(null)}
+          pendingResa={serviceModal._pendingResa || null}
+          onClose={() => { setServiceModal(null); setResaEnCours(null) }}
           onAction={handleServiceAction}
         />
       )}
@@ -815,6 +986,17 @@ export default function PlanDeSalle() {
           table={assignModal}
           onClose={() => setAssignModal(null)}
           onSave={handleAssignSave}
+        />
+      )}
+      {chooseResaModal && (
+        <ChooseResaModal
+          table={chooseResaModal}
+          reservationsNonPlacees={resasNonPlacees}
+          onClose={() => setChooseResaModal(null)}
+          onLink={async (resa) => {
+            setChooseResaModal(null)
+            await linkResaToTable(chooseResaModal, resa)
+          }}
         />
       )}
       {editModal && (
