@@ -22,8 +22,9 @@ export default function App() {
           <Route path="/" element={<Accueil />} />
           <Route path="/inscription" element={<Inscription />} />
           <Route path="/connexion" element={<Connexion />} />
+          <Route path="/dashboard" element={<Navigate to="/dashboard/reservations" replace />} />
           <Route
-            path="/dashboard"
+            path="/dashboard/configuration"
             element={
               <ProtectedRoute>
                 <Dashboard />
