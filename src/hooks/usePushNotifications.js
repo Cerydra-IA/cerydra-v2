@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-const VAPID_PUBLIC_KEY = 'BLeNO0D9QrzRCNgTrN6H4Bc9gLBdKvfAKu45PBCioSif191kS-yoeRL4azEjEJCFk2or1C8tmLEbH3LY0SiAraE'
+const VAPID_PUBLIC_KEY = 'BI974Pa53UykQGvMNTlCTgXi_zMtn0fsHH_yAAsKE66_JTxGhfmH8wQS4gpxmnFlIkXOPumZLycbDjWXq_vvhCs'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -30,13 +30,13 @@ async function register(user, restoId) {
 
     const swReg = await navigator.serviceWorker.ready
 
+    // Force re-subscribe si la clé VAPID a changé
     let sub = await swReg.pushManager.getSubscription()
-    if (!sub) {
-      sub = await swReg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      })
-    }
+    if (sub) await sub.unsubscribe()
+    sub = await swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    })
 
     const json = sub.toJSON()
     await supabase.from('push_subscriptions').upsert(
