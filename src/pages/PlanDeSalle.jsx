@@ -642,7 +642,6 @@ export default function PlanDeSalle() {
         update.client_name = null
         update.nb_persons = null
         update.reservation_id = null
-        update.heure = null
         update.notes = null
       }
 
