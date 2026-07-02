@@ -103,14 +103,16 @@ Deno.serve(async (_req) => {
 
       const resto = restoMap[resa.restaurant_id] ?? { nom: '', slug: '' }
 
+      // Marquer avant d'envoyer pour éviter les doublons
+      let flagSet = false
       try {
-        // Marquer avant d'envoyer pour éviter les doublons
         const { error: updateError } = await supabase
           .from('reservations')
           .update({ post_visit_sent: true })
           .eq('id', resa.id)
 
         if (updateError) throw new Error(`Update: ${updateError.message}`)
+        flagSet = true
 
         const webhookRes = await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
@@ -129,7 +131,6 @@ Deno.serve(async (_req) => {
         })
 
         if (!webhookRes.ok) {
-          await supabase.from('reservations').update({ post_visit_sent: false }).eq('id', resa.id)
           throw new Error(`Webhook ${webhookRes.status}: ${await webhookRes.text()}`)
         }
 
@@ -140,6 +141,10 @@ Deno.serve(async (_req) => {
         const msg = e instanceof Error ? e.message : JSON.stringify(e)
         console.error(`[send-post-visit] Erreur ${resa.id}:`, msg)
         errors.push(`${resa.id}: ${msg}`)
+        // Revert du flag pour que l'email soit retenté à la prochaine exécution
+        if (flagSet) {
+          await supabase.from('reservations').update({ post_visit_sent: false }).eq('id', resa.id)
+        }
       }
     }
 

@@ -46,6 +46,13 @@
     return true
   }
 
+  // ── Échappement HTML (anti-XSS pour les données injectées) ────────
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]))
+  }
+
   // ── Utilitaires horaires ──────────────────────────────────────────
   const JOURS = { 0:'dimanche',1:'lundi',2:'mardi',3:'mercredi',4:'jeudi',5:'vendredi',6:'samedi' }
 
@@ -299,7 +306,7 @@
           <div class="crd-header">
             <div>
               <div class="crd-title">Réserver une table</div>
-              <div class="crd-resto">${resto.nom}</div>
+              <div class="crd-resto">${esc(resto.nom)}</div>
             </div>
             <button class="crd-close" id="crd-close-btn" aria-label="Fermer">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -388,13 +395,13 @@
           </svg>
         </div>
         <h2>Réservation confirmée !</h2>
-        <p>${resto.message_confirmation || `Merci ${f.prenom}, à très bientôt chez ${resto.nom} !`}</p>
+        <p>${esc(resto.message_confirmation) || `Merci ${esc(f.prenom)}, à très bientôt chez ${esc(resto.nom)} !`}</p>
         <div class="crd-recap">
-          <div class="crd-recap-row"><span>Restaurant</span><span>${resto.nom}</span></div>
+          <div class="crd-recap-row"><span>Restaurant</span><span>${esc(resto.nom)}</span></div>
           <div class="crd-recap-row"><span>Date</span><span>${dateLabel}</span></div>
-          <div class="crd-recap-row"><span>Heure</span><span>${f.heure}</span></div>
-          <div class="crd-recap-row"><span>Personnes</span><span>${f.nb_personnes}</span></div>
-          <div class="crd-recap-row"><span>Nom</span><span>${f.prenom} ${f.nom}</span></div>
+          <div class="crd-recap-row"><span>Heure</span><span>${esc(f.heure)}</span></div>
+          <div class="crd-recap-row"><span>Personnes</span><span>${esc(f.nb_personnes)}</span></div>
+          <div class="crd-recap-row"><span>Nom</span><span>${esc(f.prenom)} ${esc(f.nom)}</span></div>
         </div>
       </div>
     `
@@ -516,8 +523,16 @@
           alert.className = 'crd-alert err'
           if (msg.includes('doublon_email')) {
             alert.textContent = 'Vous avez déjà une réservation pour ce créneau.'
-          } else if (msg.includes('creneau_complet')) {
+          } else if (msg.includes('creneau_complet') || msg.includes('trop_de_reservations')) {
             alert.textContent = 'Ce créneau est complet. Veuillez choisir un autre horaire.'
+          } else if (msg.includes('restaurant_ferme') || msg.includes('heure_hors_creneaux')) {
+            alert.textContent = 'Le restaurant est fermé à cet horaire. Veuillez choisir un autre créneau.'
+          } else if (msg.includes('delai_minimum_non_respecte')) {
+            alert.textContent = 'Ce créneau est trop proche. Veuillez réserver plus à l\'avance.'
+          } else if (msg.includes('date_invalide')) {
+            alert.textContent = 'Cette date n\'est pas disponible à la réservation.'
+          } else if (msg.includes('email_invalide')) {
+            alert.textContent = 'Veuillez saisir une adresse email valide.'
           } else {
             console.error(err)
             alert.textContent = 'Une erreur est survenue. Veuillez réessayer.'

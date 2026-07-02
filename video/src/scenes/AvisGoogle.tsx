@@ -13,7 +13,7 @@ import { Ping } from "./EmailConfirmation";
 import { SceneFade } from "./SceneFade";
 
 
-export const Rappel24h: React.FC = () => {
+export const AvisGoogle: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -23,6 +23,7 @@ export const Rappel24h: React.FC = () => {
   const labelY = interpolate(frame, [40, 65], [18, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const tagOpacity = interpolate(frame, [18, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const pingFrame = Math.max(0, frame - 50);
+  const starsOpacity = interpolate(frame, [80, 110], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#F1F5F9", overflow: "hidden" }}>
@@ -34,7 +35,7 @@ export const Rappel24h: React.FC = () => {
         opacity: tagOpacity, backgroundColor: `${colors.navy}12`, borderRadius: 30, padding: "7px 22px", whiteSpace: "nowrap",
       }}>
         <span style={{ fontFamily: fonts.body, fontSize: 15, fontWeight: 600, color: colors.navy, opacity: 0.65, letterSpacing: "0.07em", textTransform: "uppercase" }}>
-          ⏰ Rappel automatique · 24h avant la réservation
+          ⭐ Demande d'avis automatique · après la visite
         </span>
       </div>
 
@@ -48,11 +49,11 @@ export const Rappel24h: React.FC = () => {
                 ))}
               </div>
               <div style={{ flex: 1, backgroundColor: "#D2D4D8", borderRadius: 5, padding: "4px 12px", marginLeft: 6 }}>
-                <span style={{ fontFamily: fonts.body, fontSize: 12, color: "#5F6368" }}>Gmail — Rappel réservation</span>
+                <span style={{ fontFamily: fonts.body, fontSize: 12, color: "#5F6368" }}>Gmail — Merci pour votre visite</span>
               </div>
             </div>
-            <div style={{ overflow: "hidden", maxHeight: 540 }}>
-              <Img src={staticFile("screenshots/email-rappel.png")} style={{ width: "100%", display: "block" }} />
+            <div style={{ overflow: "hidden", maxHeight: 500 }}>
+              <Img src={staticFile("screenshots/email-avis.png")} style={{ width: "100%", display: "block" }} />
             </div>
           </div>
         </div>
@@ -62,6 +63,21 @@ export const Rappel24h: React.FC = () => {
         <Ping frame={pingFrame} color="#F59E0B" />
       </div>
 
+      {/* Stars */}
+      <div style={{
+        position: "absolute", bottom: 138, left: "50%",
+        transform: "translateX(-50%)",
+        opacity: starsOpacity, display: "flex", gap: 8,
+      }}>
+        {"★★★★★".split("").map((star, i) => (
+          <span key={i} style={{
+            fontSize: 38, color: "#F59E0B",
+            filter: "drop-shadow(0 2px 6px #F59E0B50)",
+            opacity: interpolate(frame, [80 + i * 8, 96 + i * 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+          }}>{star}</span>
+        ))}
+      </div>
+
       <div style={{
         position: "absolute", bottom: 68, left: "50%",
         transform: `translateX(-50%) translateY(${labelY}px)`,
@@ -69,7 +85,7 @@ export const Rappel24h: React.FC = () => {
       }}>
         <div style={{ backgroundColor: colors.navy, borderRadius: 14, padding: "13px 30px", display: "inline-flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontFamily: fonts.body, fontSize: 18, fontWeight: 600, color: colors.white }}>
-            Le client est prévenu · sans que vous fassiez quoi que ce soit
+            Plus d'avis Google · sans effort de votre part
           </span>
         </div>
       </div>
