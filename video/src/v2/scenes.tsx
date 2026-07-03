@@ -242,7 +242,7 @@ export const S4Email: React.FC<{ duration: number; vertical?: boolean }> = ({
             boxShadow: "0 40px 90px rgba(15,30,69,.22)",
             borderRadius: 18,
             overflow: "hidden",
-            maxWidth: vertical ? "88%" : 900,
+            maxWidth: vertical ? "88%" : 1020,
             maxHeight: "62%",
           }}
         >
@@ -370,7 +370,7 @@ export const S6Rappel: React.FC<{ duration: number; vertical?: boolean }> = ({
             boxShadow: "0 40px 90px rgba(15,30,69,.22)",
             borderRadius: 18,
             overflow: "hidden",
-            maxWidth: vertical ? "88%" : 880,
+            maxWidth: vertical ? "88%" : 1060,
             maxHeight: "58%",
           }}
         >
@@ -417,7 +417,7 @@ export const S7Avis: React.FC<{ duration: number; vertical?: boolean }> = ({
             borderRadius: 18,
             overflow: "hidden",
             boxShadow: "0 40px 90px rgba(0,0,0,.4)",
-            maxWidth: vertical ? "86%" : 820,
+            maxWidth: vertical ? "86%" : 1150,
             maxHeight: "46%",
           }}
         >
