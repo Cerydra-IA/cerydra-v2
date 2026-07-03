@@ -16,10 +16,11 @@ function timeToMinutes(t) {
 }
 
 function generateSlots(debut, fin) {
+  // Dernière arrivée : 1h avant la fin du service
   const slots = []
   let cur = timeToMinutes(debut)
-  const end = timeToMinutes(fin)
-  while (cur < end) {
+  const end = timeToMinutes(fin) - 60
+  while (cur <= end) {
     const h = String(Math.floor(cur / 60)).padStart(2, '0')
     const m = String(cur % 60).padStart(2, '0')
     slots.push(`${h}:${m}`)

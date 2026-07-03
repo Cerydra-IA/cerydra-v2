@@ -59,9 +59,10 @@
   function toMin(t) { const [h,m]=t.split(':').map(Number); return h*60+m }
 
   function slots(debut, fin) {
+    // Dernière arrivée : 1h avant la fin du service
     const out = []
-    let c = toMin(debut), e = toMin(fin)
-    while (c < e) {
+    let c = toMin(debut), e = toMin(fin) - 60
+    while (c <= e) {
       out.push(`${String(Math.floor(c/60)).padStart(2,'0')}:${String(c%60).padStart(2,'0')}`)
       c += 30
     }
