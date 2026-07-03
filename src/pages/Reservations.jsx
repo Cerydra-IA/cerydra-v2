@@ -27,6 +27,100 @@ function formatDate(dateStr) {
   })
 }
 
+const EMPTY_FORM = {
+  prenom: '', nom: '', telephone: '', email: '',
+  date: '', heure: '', nb_personnes: 2, message: '',
+}
+
+// Modal de réservation manuelle (client au téléphone / sur place)
+function NouvelleResaModal({ restoId, onClose, onCreated }) {
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  const inputCls =
+    'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1a1a2e] transition-colors'
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!form.prenom || !form.nom || !form.date || !form.heure) {
+      setError('Prénom, nom, date et heure sont obligatoires.')
+      return
+    }
+    setSaving(true)
+    const { error: err } = await supabase.from('reservations').insert({
+      restaurant_id: restoId,
+      prenom: form.prenom,
+      nom: form.nom,
+      telephone: form.telephone || null,
+      email: form.email || null,
+      date: form.date,
+      heure: form.heure,
+      nb_personnes: Number(form.nb_personnes),
+      message: form.message || null,
+      statut: 'confirmée',
+    })
+    setSaving(false)
+    if (err) {
+      const msg = err.message || ''
+      if (msg.includes('date_invalide')) setError('Date invalide (passée ou trop lointaine).')
+      else if (msg.includes('nb_personnes_invalide')) setError('Nombre de personnes invalide.')
+      else if (msg.includes('email_invalide')) setError('Email invalide.')
+      else setError('Erreur : ' + msg)
+      return
+    }
+    onCreated()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-bold text-[#1a1a2e]">Nouvelle réservation</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <input className={inputCls} placeholder="Prénom *" value={form.prenom} onChange={set('prenom')} />
+            <input className={inputCls} placeholder="Nom *" value={form.nom} onChange={set('nom')} />
+          </div>
+          <input className={inputCls} placeholder="Téléphone" value={form.telephone} onChange={set('telephone')} />
+          <input className={inputCls} type="email" placeholder="Email (facultatif — pour la confirmation et le rappel)" value={form.email} onChange={set('email')} />
+          <div className="grid grid-cols-3 gap-3">
+            <input className={`${inputCls} col-span-1`} type="date" value={form.date} onChange={set('date')} />
+            <input className={`${inputCls} col-span-1`} type="time" value={form.heure} onChange={set('heure')} />
+            <select className={`${inputCls} col-span-1`} value={form.nb_personnes} onChange={set('nb_personnes')}>
+              {Array.from({ length: 20 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>{i + 1} pers.</option>
+              ))}
+            </select>
+          </div>
+          <textarea className={`${inputCls} resize-none`} rows={2} placeholder="Note (allergies, table préférée…)" value={form.message} onChange={set('message')} />
+          {error && (
+            <p className="text-xs text-red-500 bg-red-50 rounded-xl px-3 py-2">{error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#2a2a4e] transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Enregistrement…' : 'Enregistrer la réservation'}
+          </button>
+          <p className="text-[11px] text-gray-400 text-center">
+            Créée en statut « Confirmée ». Si un email est renseigné, le client reçoit la confirmation et le rappel automatiques.
+          </p>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function Reservations() {
   const { user } = useAuth()
   const [reservations, setReservations] = useState([])
@@ -36,6 +130,7 @@ export default function Reservations() {
   const [updatingId, setUpdatingId] = useState(null)
   const [restoId, setRestoId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [showNewModal, setShowNewModal] = useState(false)
 
   usePushNotifications(user, restoId)
 
@@ -141,11 +236,29 @@ export default function Reservations() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
+      {showNewModal && (
+        <NouvelleResaModal
+          restoId={restoId}
+          onClose={() => setShowNewModal(false)}
+          onCreated={fetchReservations}
+        />
+      )}
+
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-xl font-bold text-[#1a1a2e]">Réservations</h1>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowNewModal(true)}
+              disabled={!restoId}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1a1a2e] text-white text-xs font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-40"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nouvelle réservation
+            </button>
             <button
               onClick={exportCSV}
               disabled={reservations.length === 0}

@@ -179,6 +179,7 @@ export default function RestoPublic() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [confirmed, setConfirmed] = useState(false)
+  const [fermetures, setFermetures] = useState([])
 
   useEffect(() => {
     const load = async () => {
@@ -197,12 +198,22 @@ export default function RestoPublic() {
         .eq('restaurant_id', restoData.id)
 
       setHoraires(horairesData || [])
+
+      const { data: fermeturesData } = await supabase
+        .from('fermetures')
+        .select('date')
+        .eq('restaurant_id', restoData.id)
+      setFermetures((fermeturesData || []).map((f) => f.date))
+
       setLoading(false)
     }
     load()
   }, [slug])
 
-  const slots = useMemo(() => getSlotsForDate(horaires, form.date), [horaires, form.date])
+  const slots = useMemo(
+    () => (fermetures.includes(form.date) ? [] : getSlotsForDate(horaires, form.date)),
+    [horaires, fermetures, form.date]
+  )
 
   // Quand la date change, reset l'heure si le slot actuel n'est plus disponible
   const handleDateChange = (val) => {

@@ -12,18 +12,24 @@ function formatDate(dateStr) {
 
 export default function Annuler() {
   const { token } = useParams()
-  const [status, setStatus] = useState('loading') // loading | success | already | error
+  // confirm : demande la confirmation avant d'annuler — indispensable car les
+  // scanners d'emails (Outlook, antivirus) pré-visitent les liens et
+  // annuleraient la réservation automatiquement.
+  const [status, setStatus] = useState('confirm') // confirm | loading | success | already | error
   const [data, setData] = useState(null)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setMessage('Lien invalide.'); return }
+    if (!token) { setStatus('error'); setMessage('Lien invalide.') }
+  }, [token])
 
+  const confirmerAnnulation = () => {
+    setStatus('loading')
     supabase.rpc('annuler_reservation', { p_token: token })
       .then(({ data: res, error }) => {
         if (error) {
           setStatus('error')
-          setMessage(error.message)
+          setMessage('Ce lien d\'annulation est invalide ou a expiré.')
           return
         }
         if (res.success) {
@@ -34,7 +40,7 @@ export default function Annuler() {
           setMessage(res.error)
         }
       })
-  }, [token])
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -45,6 +51,36 @@ export default function Annuler() {
 
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="max-w-md w-full text-center">
+
+          {/* Confirmation avant annulation */}
+          {status === 'confirm' && (
+            <>
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-[#1a1a2e] mb-2">Annuler votre réservation ?</h1>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                Cette action est définitive. Confirmez pour libérer votre table.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={confirmerAnnulation}
+                  className="px-6 py-3 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
+                >
+                  Oui, annuler ma réservation
+                </button>
+                <Link
+                  to="/"
+                  className="px-6 py-3 border border-gray-200 text-[#1a1a2e] rounded-xl text-sm font-medium hover:border-gray-300 transition-colors"
+                >
+                  Non, je garde ma table
+                </Link>
+              </div>
+            </>
+          )}
 
           {/* Chargement */}
           {status === 'loading' && (

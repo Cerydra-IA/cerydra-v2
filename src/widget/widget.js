@@ -410,13 +410,17 @@
 
   // ── Init principal ────────────────────────────────────────────────
   async function init() {
-    let resto, horaires
+    let resto, horaires, fermetures = []
 
     try {
       const [restos] = await sbGet('restaurants', `slug=eq.${slug}&select=*`)
       if (!restos) return console.warn(`[CERYDRA] Restaurant "${slug}" introuvable.`)
       resto = restos
       horaires = await sbGet('horaires', `restaurant_id=eq.${resto.id}&select=*`)
+      try {
+        const f = await sbGet('fermetures', `restaurant_id=eq.${resto.id}&select=date`)
+        fermetures = (f || []).map((x) => x.date)
+      } catch (_) { /* table absente : pas de fermetures */ }
     } catch (e) {
       return console.error('[CERYDRA] Erreur chargement données:', e)
     }
@@ -466,7 +470,9 @@
       const submitBtn = shadow.getElementById('crd-submit-btn')
 
       dateInput.addEventListener('change', () => {
-        const s = getSlotsForDate(horaires, dateInput.value)
+        const s = fermetures.includes(dateInput.value)
+          ? []
+          : getSlotsForDate(horaires, dateInput.value)
         if (!dateInput.value) {
           heurePlaceholder.style.display = ''
           heureSelect.style.display = 'none'

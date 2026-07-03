@@ -103,6 +103,31 @@ export default function Dashboard() {
     setTimeout(() => setToast({ message: '', type: 'success' }), 3000)
   }
 
+  // ── Fermetures exceptionnelles ──────────────────────────────────
+  const [fermetures, setFermetures] = useState([])
+  const [newFermeture, setNewFermeture] = useState({ date: '', motif: '' })
+
+  const addFermeture = async () => {
+    if (!newFermeture.date || !restoId) return
+    const { data, error } = await supabase
+      .from('fermetures')
+      .insert({ restaurant_id: restoId, date: newFermeture.date, motif: newFermeture.motif || null })
+      .select('id, date, motif')
+      .single()
+    if (error) {
+      showToast(error.message.includes('duplicate') ? 'Cette date est déjà enregistrée.' : 'Erreur : ' + error.message, 'error')
+      return
+    }
+    setFermetures((f) => [...f, data].sort((a, b) => a.date.localeCompare(b.date)))
+    setNewFermeture({ date: '', motif: '' })
+    showToast('Fermeture ajoutée — le widget refusera les réservations ce jour-là.')
+  }
+
+  const removeFermeture = async (id) => {
+    const { error } = await supabase.from('fermetures').delete().eq('id', id)
+    if (!error) setFermetures((f) => f.filter((x) => x.id !== id))
+  }
+
   // Charge les données existantes
   useEffect(() => {
     if (!user) return
@@ -132,6 +157,15 @@ export default function Dashboard() {
           widget_bg_image_url: restoData.widget_bg_image_url || '',
         })
         if (restoData.slug) setSlugManuel(true)
+
+        // Charge les fermetures exceptionnelles à venir
+        const { data: fermeturesData } = await supabase
+          .from('fermetures')
+          .select('id, date, motif')
+          .eq('restaurant_id', restoData.id)
+          .gte('date', new Date().toISOString().split('T')[0])
+          .order('date')
+        setFermetures(fermeturesData || [])
 
         // Charge les horaires
         const { data: horairesData } = await supabase
@@ -385,6 +419,62 @@ export default function Dashboard() {
                 </p>
               </Field>
             </div>
+          </SectionCard>
+
+          {/* — Fermetures exceptionnelles — */}
+          <SectionCard
+            title="Fermetures exceptionnelles"
+            description="Congés, jours fériés… Le widget refusera les réservations à ces dates."
+          >
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <input
+                type="date"
+                className={inputCls + ' sm:max-w-[180px]'}
+                min={new Date().toISOString().split('T')[0]}
+                value={newFermeture.date}
+                onChange={(e) => setNewFermeture({ ...newFermeture, date: e.target.value })}
+              />
+              <input
+                type="text"
+                className={inputCls}
+                placeholder="Motif (facultatif) — ex : congés annuels"
+                value={newFermeture.motif}
+                onChange={(e) => setNewFermeture({ ...newFermeture, motif: e.target.value })}
+              />
+              <button
+                type="button"
+                onClick={addFermeture}
+                disabled={!newFermeture.date}
+                className="px-5 py-2.5 rounded-xl bg-[#1a1a2e] text-white text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-40 whitespace-nowrap"
+              >
+                Ajouter
+              </button>
+            </div>
+            {fermetures.length === 0 ? (
+              <p className="text-xs text-gray-400">Aucune fermeture prévue.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {fermetures.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5">
+                    <div className="text-sm">
+                      <span className="font-medium text-[#1a1a2e]">
+                        {new Date(f.date + 'T00:00:00').toLocaleDateString('fr-FR', {
+                          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                        })}
+                      </span>
+                      {f.motif && <span className="text-gray-400 ml-2">— {f.motif}</span>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFermeture(f.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
 
           {/* — Message de confirmation — */}
