@@ -46,7 +46,7 @@ export const S1Appel: React.FC<{ duration: number; vertical?: boolean }> = ({
             <Avatar name="Sophie" hue="#7c5cff" size={vertical ? 52 : 64} />
           </div>
           <PhoneFrame width={vertical ? 260 : 300}>
-            <CallingScreen />
+            <CallingScreen missedAt={Math.round(duration * 0.62)} />
           </PhoneFrame>
         </div>
         {/* Côté Marc */}
@@ -65,7 +65,10 @@ export const S1Appel: React.FC<{ duration: number; vertical?: boolean }> = ({
           <div style={{ position: "absolute", top: vertical ? 28 : 48, right: 48 }}>
             <Avatar name="Marc" hue="#e8743b" size={vertical ? 52 : 64} />
           </div>
-          <div style={{ fontSize: vertical ? 110 : 150, transform: `rotate(${shake}deg)` }}>🍳</div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: vertical ? 6 : 10 }}>
+            <div style={{ fontSize: vertical ? 130 : 180 }}>👨‍🍳</div>
+            <div style={{ fontSize: vertical ? 80 : 110, transform: `rotate(${shake}deg)` }}>🍳</div>
+          </div>
           <div
             style={{
               position: "absolute",
@@ -112,6 +115,12 @@ export const S2Site: React.FC<{ duration: number; vertical?: boolean }> = ({
 }) => {
   const frame = useCurrentFrame();
   const zoom = interpolate(frame, [0, duration], [1, 1.08]);
+  // halo pulsant sur le bouton Réserver du widget
+  const ringPulse = 1 + 0.18 * Math.sin(frame / 5);
+  const ringOpacity = interpolate(frame, [40, 60], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
     <Fade duration={duration}>
       <AbsoluteFill style={{ background: "#0a0805", justifyContent: "center", alignItems: "center" }}>
@@ -122,6 +131,7 @@ export const S2Site: React.FC<{ duration: number; vertical?: boolean }> = ({
             height: "100%",
             objectFit: "cover",
             transform: `scale(${zoom})`,
+            transformOrigin: vertical ? "center" : "100% 100%",
           }}
         />
         <div
@@ -131,6 +141,23 @@ export const S2Site: React.FC<{ duration: number; vertical?: boolean }> = ({
             background: "linear-gradient(180deg,transparent 40%,rgba(5,4,2,.88) 100%)",
           }}
         />
+        {/* halo sur le bouton Réserver (bas droite du site) */}
+        {!vertical && (
+          <div
+            style={{
+              position: "absolute",
+              right: "1.2%",
+              bottom: "1.6%",
+              width: 175,
+              height: 64,
+              borderRadius: 999,
+              border: "4px solid #ffd166",
+              boxShadow: "0 0 40px rgba(255,209,102,.55)",
+              transform: `scale(${ringPulse})`,
+              opacity: ringOpacity,
+            }}
+          />
+        )}
         <div
           style={{
             position: "absolute",

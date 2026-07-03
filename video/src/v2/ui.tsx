@@ -224,10 +224,11 @@ export const Fade: React.FC<{
 };
 
 // ─── Téléphone qui sonne (côté Sophie) ─────────────────────────────
-export const CallingScreen: React.FC<{ answered?: boolean }> = () => {
+export const CallingScreen: React.FC<{ missedAt?: number }> = ({ missedAt = 99999 }) => {
   const frame = useCurrentFrame();
-  const pulse = 1 + 0.05 * Math.sin(frame / 4);
-  const secs = Math.floor(frame / 30);
+  const missed = frame >= missedAt;
+  const pulse = missed ? 1 : 1 + 0.05 * Math.sin(frame / 4);
+  const secs = Math.floor(Math.min(frame, missedAt) / 30);
   return (
     <div
       style={{
@@ -241,12 +242,14 @@ export const CallingScreen: React.FC<{ answered?: boolean }> = () => {
         fontFamily: fonts.body,
       }}
     >
-      <div style={{ color: "rgba(255,255,255,.6)", fontSize: 17 }}>appel en cours…</div>
+      <div style={{ color: missed ? "#ff6b6b" : "rgba(255,255,255,.6)", fontSize: 17, fontWeight: missed ? 700 : 400 }}>
+        {missed ? "appel manqué" : "appel en cours…"}
+      </div>
       <div style={{ color: "#fff", fontFamily: fonts.heading, fontSize: 34, fontWeight: 700, marginTop: 8 }}>
         Le Comptoir
       </div>
       <div style={{ color: "rgba(255,255,255,.45)", fontSize: 16, marginTop: 6 }}>
-        00:{String(secs).padStart(2, "0")}
+        {missed ? "pas de réponse" : `00:${String(secs).padStart(2, "0")}`}
       </div>
       <div
         style={{
@@ -254,12 +257,13 @@ export const CallingScreen: React.FC<{ answered?: boolean }> = () => {
           width: 130,
           height: 130,
           borderRadius: "50%",
-          background: "#2a2a33",
+          background: missed ? "#3a2026" : "#2a2a33",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           transform: `scale(${pulse})`,
           fontSize: 52,
+          filter: missed ? "grayscale(.6)" : "none",
         }}
       >
         📞
@@ -276,6 +280,7 @@ export const CallingScreen: React.FC<{ answered?: boolean }> = () => {
           alignItems: "center",
           justifyContent: "center",
           fontSize: 34,
+          opacity: missed ? 0.4 : 1,
         }}
       >
         <span style={{ transform: "rotate(135deg)" }}>📞</span>
