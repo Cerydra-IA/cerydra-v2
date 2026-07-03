@@ -305,11 +305,11 @@ function AssignModal({ table, onClose, onSave }) {
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Nom du client</label>
+            <label className="block text-xs font-medium text-[#1a1a2e] mb-1.5">Nom du client (optionnel)</label>
             <input
               autoFocus
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition-colors"
-              placeholder="Marie Dupont"
+              placeholder="Laissez vide si pas le temps !"
               value={form.client_name}
               onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))}
             />
@@ -333,7 +333,7 @@ function AssignModal({ table, onClose, onSave }) {
             />
           </div>
           <button
-            onClick={() => form.client_name.trim() && onSave(form)}
+            onClick={() => onSave({ ...form, client_name: form.client_name.trim() || 'Sans nom' })}
             className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50"
           >
             Assigner et marquer Occupée
