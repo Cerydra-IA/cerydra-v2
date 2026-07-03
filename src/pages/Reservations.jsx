@@ -35,6 +35,7 @@ export default function Reservations() {
   const [filtre, setFiltre] = useState('toutes')
   const [updatingId, setUpdatingId] = useState(null)
   const [restoId, setRestoId] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   usePushNotifications(user, restoId)
 
@@ -108,8 +109,14 @@ export default function Reservations() {
     setUpdatingId(null)
   }
 
+  // window.confirm est bloqué dans les PWA iOS installées → confirmation en 2 taps
   const deleteReservation = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) return
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id)
+      setTimeout(() => setConfirmDeleteId((cur) => (cur === id ? null : cur)), 3000)
+      return
+    }
+    setConfirmDeleteId(null)
     const { error } = await supabase.from('reservations').delete().eq('id', id)
     if (!error) {
       setReservations((r) => r.filter((res) => res.id !== id))
@@ -269,9 +276,13 @@ export default function Reservations() {
                     )}
                     <button
                       onClick={() => deleteReservation(r.id)}
-                      className="px-3 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium hover:bg-gray-100 hover:text-red-500 transition-colors"
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        confirmDeleteId === r.id
+                          ? 'bg-red-500 text-white'
+                          : 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-red-500'
+                      }`}
                     >
-                      Supprimer
+                      {confirmDeleteId === r.id ? 'Confirmer ?' : 'Supprimer'}
                     </button>
                   </div>
                 </div>
@@ -347,9 +358,13 @@ export default function Reservations() {
                     )}
                     <button
                       onClick={() => deleteReservation(r.id)}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5 underline-offset-2 hover:underline"
+                      className={`text-xs transition-colors mt-0.5 underline-offset-2 hover:underline ${
+                        confirmDeleteId === r.id
+                          ? 'text-red-500 font-semibold'
+                          : 'text-gray-400 hover:text-red-500'
+                      }`}
                     >
-                      Supprimer
+                      {confirmDeleteId === r.id ? 'Confirmer ?' : 'Supprimer'}
                     </button>
                   </div>
                 </div>

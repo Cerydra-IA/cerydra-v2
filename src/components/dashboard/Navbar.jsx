@@ -46,6 +46,14 @@ export default function Navbar() {
             })}
           </div>
           <div className="ml-auto flex items-center gap-4">
+            <a
+              href="/guide-utilisation.pdf"
+              target="_blank"
+              rel="noopener"
+              className="text-xs text-gray-400 hover:text-[#1a1a2e] transition-colors"
+            >
+              Aide
+            </a>
             <span className="text-xs text-gray-400 hidden lg:block">{user?.email}</span>
             {user?.email === 'contact@cerydra.fr' && (
               <Link
@@ -99,6 +107,14 @@ export default function Navbar() {
             </Link>
           )
         })}
+        <a
+          href="/guide-utilisation.pdf"
+          target="_blank"
+          rel="noopener"
+          className="flex-shrink-0 px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 whitespace-nowrap"
+        >
+          Aide
+        </a>
       </div>
     </nav>
   )
