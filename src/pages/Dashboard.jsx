@@ -26,6 +26,7 @@ const RESTO_DEFAUT = {
   nb_tables: '',
   nb_couverts_max: '',
   delai_minimum_heures: 2,
+  duree_occupation_minutes: 90,
   message_confirmation: 'Merci pour votre réservation ! Nous avons hâte de vous accueillir.',
   widget_primary_color: '#1a1a2e',
   widget_bg_color: '#ffffff',
@@ -123,6 +124,7 @@ export default function Dashboard() {
           nb_tables: restoData.nb_tables || '',
           nb_couverts_max: restoData.nb_couverts_max || '',
           delai_minimum_heures: restoData.delai_minimum_heures ?? 2,
+          duree_occupation_minutes: restoData.duree_occupation_minutes ?? 90,
           message_confirmation: restoData.message_confirmation || '',
           widget_primary_color: restoData.widget_primary_color || '#1a1a2e',
           widget_bg_color: restoData.widget_bg_color || '#ffffff',
@@ -364,6 +366,23 @@ export default function Dashboard() {
                     </option>
                   ))}
                 </select>
+              </Field>
+
+              <Field label="Durée d'occupation d'une table">
+                <select
+                  className={selectCls}
+                  value={resto.duree_occupation_minutes}
+                  onChange={(e) => setResto({ ...resto, duree_occupation_minutes: Number(e.target.value) })}
+                >
+                  {[60, 90, 120, 150].map((m) => (
+                    <option key={m} value={m}>
+                      {m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}`}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Sert à calculer les créneaux complets : une table réservée à 20h reste indisponible pendant cette durée.
+                </p>
               </Field>
             </div>
           </SectionCard>
