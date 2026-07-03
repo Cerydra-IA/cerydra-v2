@@ -522,7 +522,9 @@
             heure: f.heure,
             nb_personnes: Number(f.nb_personnes),
             message: f.message || null,
-            statut: 'en_attente',
+            // Confirmation instantanée : la validation de capacité côté serveur
+            // garantit qu'il y a de la place, pas besoin de validation manuelle
+            statut: 'confirmée',
           })
           formArea.innerHTML = buildConfirm(resto, f)
         } catch (err) {

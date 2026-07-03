@@ -240,7 +240,7 @@ export default function RestoPublic() {
       heure: form.heure,
       nb_personnes: Number(form.nb_personnes),
       message: form.message || null,
-      statut: 'en_attente',
+      statut: 'confirmée',
     })
     setSubmitting(false)
 
