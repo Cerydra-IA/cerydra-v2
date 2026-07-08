@@ -38,7 +38,7 @@ def header(page_title, page_num):
     # footer
     c.setFillColor(GRAY_LIGHT)
     c.setFont('Helvetica', 8)
-    c.drawCentredString(W / 2, 10 * mm, f'CERYDRA  ·  cerydra.fr  ·  contact@cerydra.fr  —  page {page_num}/4')
+    c.drawCentredString(W / 2, 10 * mm, f'CERYDRA  ·  cerydra.fr  ·  contact@cerydra.fr  —  page {page_num}/5')
 
 
 def section_title(y, num, title):
@@ -115,6 +115,43 @@ def bullet(y, text, indent=4):
     return y - 5.6 * mm
 
 
+
+# ═══════════════════ PAGE 0 — Couverture ═══════════════════
+from PIL import Image as _PILImage
+_logo = r"C:/Users/PC/Desktop/CERYDRA/cerydra-v2/public/logo.png"
+_li = _PILImage.open(_logo)
+_lw = 95 * mm
+_lh = _lw * _li.height / _li.width
+c.drawImage(_logo, (W - _lw) / 2, H - 60 * mm - _lh, _lw, _lh, preserveAspectRatio=True, mask='auto')
+
+c.setFillColor(NAVY)
+c.setFont('Helvetica-Bold', 40)
+c.drawCentredString(W / 2, H - 175 * mm, 'CERYDRA')
+c.setFillColor(GRAY)
+c.setFont('Helvetica', 15)
+c.drawCentredString(W / 2, H - 186 * mm, "Guide d'utilisation")
+
+c.setStrokeColor(HexColor('#e5e7eb'))
+c.setLineWidth(0.8)
+c.line(W / 2 - 30 * mm, H - 193 * mm, W / 2 + 30 * mm, H - 193 * mm)
+
+c.setFillColor(NAVY)
+c.setFont('Helvetica-Bold', 13)
+c.drawCentredString(W / 2, H - 203 * mm, 'Vos réservations en pilote automatique.')
+
+c.setFillColor(GRAY)
+c.setFont('Helvetica', 10.5)
+c.drawCentredString(W / 2, H - 213 * mm, 'Réservations en ligne 24h/24 · Confirmation instantanée · Rappels automatiques')
+c.drawCentredString(W / 2, H - 219 * mm, 'Plan de salle en temps réel · Avis Google · Notifications sur votre téléphone')
+
+c.setFillColor(NAVY)
+c.rect(0, 0, W, 16 * mm, fill=1, stroke=0)
+c.setFillColor(white)
+c.setFont('Helvetica', 9)
+c.drawCentredString(W / 2, 6.5 * mm, 'cerydra.fr  ·  contact@cerydra.fr')
+
+c.showPage()
+
 # ═══════════════════ PAGE 1 — Réservations ═══════════════════
 header('Vos réservations', 1)
 y = H - 36 * mm
@@ -164,10 +201,11 @@ y -= 4 * mm
 
 c.setFillColor(NAVY)
 c.setFont('Helvetica-Bold', 10.5)
-c.drawString(M + 4 * mm, y, 'Supprimer une réservation')
+c.drawString(M + 4 * mm, y, 'Un client réserve par téléphone ou sur place ?')
 y -= 6.5 * mm
-y = step(y, 1, 'Touchez « Supprimer » puis confirmez.',
-         sub='À utiliser uniquement pour les erreurs ou les tests — préférez « Annuler ».')
+y = step(y, 1, 'Touchez le bouton « + Nouvelle réservation » en haut de l’écran.')
+y = step(y, 2, 'Remplissez nom, date, heure — l’email est facultatif.',
+         sub='S’il est renseigné, le client reçoit la confirmation et le rappel automatiques.')
 y -= 4 * mm
 
 # encadré filtres
@@ -179,10 +217,10 @@ c.drawString(M + 5 * mm, y - 4 * mm, 'Astuce — les filtres en haut de l’écr
 c.setFillColor(GRAY)
 c.setFont('Helvetica', 9.5)
 c.drawString(M + 5 * mm, y - 9.5 * mm, '« À venir » affiche uniquement les prochains services.')
-c.drawString(M + 5 * mm, y - 14 * mm, '« Exporter CSV » télécharge toutes vos réservations (pour Excel).')
+c.drawString(M + 5 * mm, y - 14 * mm, '« Exporter CSV » : export Excel. « Supprimer » : réservé aux erreurs de saisie, préférez « Annuler ».')
 y -= 26 * mm
 
-shot('shot_reservations.png', y, 150, 'Votre écran Réservations : boutons Confirmer / Annuler sur chaque ligne.')
+shot('shot_reservations.png', y, 132, 'Votre écran Réservations : boutons Confirmer / Annuler sur chaque ligne.')
 
 c.showPage()
 
@@ -278,6 +316,9 @@ faqs = [
     ('Comment voir mes statistiques ?',
      ['Onglet « Statistiques » : nombre de réservations, couverts, évolution par semaine',
       'et par mois. Idéal pour anticiper vos commandes et vos plannings.']),
+    ('Je pars en congés, comment bloquer les réservations ?',
+     ['Configuration → « Fermetures exceptionnelles » : ajoutez les dates concernées.',
+      'Le module de réservation refusera automatiquement ces jours-là.']),
     ('Un client veut annuler par téléphone, comment faire ?',
      ['Ouvrez « Réservations », retrouvez sa réservation (filtre « À venir »), touchez',
       '« Annuler ». C’est immédiat.']),
