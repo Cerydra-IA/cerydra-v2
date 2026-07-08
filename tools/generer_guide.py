@@ -285,82 +285,11 @@ c.drawString(M + 5 * mm, y - 13.5 * mm, 'tablette, vous le voyez instantanément
 
 c.showPage()
 
-# ═══════════════════ PAGE 3 — Notifications + FAQ ═══════════════════
-header('Notifications & questions', 3)
-y = H - 36 * mm
-
-y = section_title(y, 3, 'Les notifications')
-c.setFillColor(GRAY)
-c.setFont('Helvetica', 10)
-c.drawString(M, y, 'Vous êtes prévenu automatiquement, même l’application fermée.')
-y -= 8 * mm
-
-y = bullet(y, 'Nouvelle réservation → notification sur votre téléphone, immédiatement.')
-y = bullet(y, 'Le client reçoit : confirmation par email, rappel la veille, invitation à laisser un')
-c.setFillColor(NAVY); c.setFont('Helvetica', 10)
-c.drawString(M + 9 * mm, y, 'avis Google le lendemain — tout est automatique, vous n’avez rien à faire.')
-y -= 12 * mm
-
-y = section_title(y, 4, 'Questions fréquentes')
-y -= 2 * mm
-
-faqs = [
-    ('Je ne reçois plus les notifications, que faire ?',
-     ['1.  Vérifiez que l’application CERYDRA est bien installée sur votre écran d’accueil',
-      '     (pas ouverte dans Safari ou Chrome).',
-      '2.  Vérifiez : Réglages → Notifications → Cerydra → autorisées.',
-      '3.  Sinon : supprimez l’icône de l’écran d’accueil, réinstallez-la depuis app.cerydra.fr,',
-      '     et acceptez les notifications quand la question apparaît.',
-      '4.  Toujours rien ? Écrivez-nous (voir en bas) — les emails continuent d’arriver',
-      '     dans tous les cas.']),
-    ('Comment voir mes statistiques ?',
-     ['Onglet « Statistiques » : nombre de réservations, couverts, évolution par semaine',
-      'et par mois. Idéal pour anticiper vos commandes et vos plannings.']),
-    ('Je pars en congés, comment bloquer les réservations ?',
-     ['Configuration → « Fermetures exceptionnelles » : ajoutez les dates concernées.',
-      'Le module de réservation refusera automatiquement ces jours-là.']),
-    ('Un client veut annuler par téléphone, comment faire ?',
-     ['Ouvrez « Réservations », retrouvez sa réservation (filtre « À venir »), touchez',
-      '« Annuler ». C’est immédiat.']),
-    ('Le client peut-il annuler tout seul ?',
-     ['Oui — chaque email de confirmation et de rappel contient un lien d’annulation.',
-      'La réservation passe alors en « Annulée » automatiquement.']),
-]
-
-for q, lines in faqs:
-    c.setFillColor(NAVY)
-    c.setFont('Helvetica-Bold', 11)
-    c.drawString(M + 4 * mm, y, q)
-    y -= 6 * mm
-    c.setFillColor(GRAY)
-    c.setFont('Helvetica', 9.5)
-    for ln in lines:
-        c.drawString(M + 8 * mm, y, ln)
-        y -= 4.8 * mm
-    y -= 6 * mm
-
-# encadré contact final
-y -= 2 * mm
-c.setFillColor(NAVY)
-c.roundRect(M, y - 30 * mm, W - 2 * M, 32 * mm, 4 * mm, fill=1, stroke=0)
-c.setFillColor(white)
-c.setFont('Helvetica-Bold', 13)
-c.drawCentredString(W / 2, y - 9 * mm, 'Un problème ? Une question ?')
-c.setFont('Helvetica', 11)
-c.setFillColor(HexColor('#c7c9d9'))
-c.drawCentredString(W / 2, y - 16 * mm, 'Écrivez-nous, nous répondons rapidement :')
-c.setFont('Helvetica-Bold', 14)
-c.setFillColor(white)
-c.drawCentredString(W / 2, y - 24 * mm, 'contact@cerydra.fr')
-
-
-c.showPage()
-
 # ═══════════════════ PAGE 4 — Installer l'application ═══════════════════
-header("Installer l'application", 4)
+header("Installer l'application", 3)
 y = H - 36 * mm
 
-y = section_title(y, 5, "Installer CERYDRA sur votre téléphone")
+y = section_title(y, 3, "Installer CERYDRA sur votre téléphone")
 c.setFillColor(GRAY)
 c.setFont('Helvetica', 10)
 c.drawString(M, y, "2 minutes, une seule fois. Indispensable pour recevoir les notifications. (iPhone / Safari)")
@@ -430,6 +359,77 @@ c.setFont('Helvetica-Oblique', 8.5)
 c.drawString(M + 5 * mm, y - 18.5 * mm, "Sur Android : ouvrez app.cerydra.fr dans Chrome, menu (3 points) > « Installer l'application ».")
 
 c.showPage()
+# ═══════════════════ PAGE 3 — Notifications + FAQ ═══════════════════
+header('Notifications & questions', 4)
+y = H - 36 * mm
+
+y = section_title(y, 4, 'Les notifications')
+c.setFillColor(GRAY)
+c.setFont('Helvetica', 10)
+c.drawString(M, y, 'Vous êtes prévenu automatiquement, même l’application fermée.')
+y -= 8 * mm
+
+y = bullet(y, 'Nouvelle réservation → notification sur votre téléphone, immédiatement.')
+y = bullet(y, 'Le client reçoit : confirmation par email, rappel la veille, invitation à laisser un')
+c.setFillColor(NAVY); c.setFont('Helvetica', 10)
+c.drawString(M + 9 * mm, y, 'avis Google le lendemain — tout est automatique, vous n’avez rien à faire.')
+y -= 12 * mm
+
+y = section_title(y, 5, 'Questions fréquentes')
+y -= 2 * mm
+
+faqs = [
+    ('Je ne reçois plus les notifications, que faire ?',
+     ['1.  Vérifiez que l’application CERYDRA est bien installée sur votre écran d’accueil',
+      '     (pas ouverte dans Safari ou Chrome).',
+      '2.  Vérifiez : Réglages → Notifications → Cerydra → autorisées.',
+      '3.  Sinon : supprimez l’icône de l’écran d’accueil, réinstallez-la depuis app.cerydra.fr,',
+      '     et acceptez les notifications quand la question apparaît.',
+      '4.  Toujours rien ? Écrivez-nous (voir en bas) — les emails continuent d’arriver',
+      '     dans tous les cas.']),
+    ('Comment voir mes statistiques ?',
+     ['Onglet « Statistiques » : nombre de réservations, couverts, évolution par semaine',
+      'et par mois. Idéal pour anticiper vos commandes et vos plannings.']),
+    ('Je pars en congés, comment bloquer les réservations ?',
+     ['Configuration → « Fermetures exceptionnelles » : ajoutez les dates concernées.',
+      'Le module de réservation refusera automatiquement ces jours-là.']),
+    ('Un client veut annuler par téléphone, comment faire ?',
+     ['Ouvrez « Réservations », retrouvez sa réservation (filtre « À venir »), touchez',
+      '« Annuler ». C’est immédiat.']),
+    ('Le client peut-il annuler tout seul ?',
+     ['Oui — chaque email de confirmation et de rappel contient un lien d’annulation.',
+      'La réservation passe alors en « Annulée » automatiquement.']),
+]
+
+for q, lines in faqs:
+    c.setFillColor(NAVY)
+    c.setFont('Helvetica-Bold', 11)
+    c.drawString(M + 4 * mm, y, q)
+    y -= 6 * mm
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 9.5)
+    for ln in lines:
+        c.drawString(M + 8 * mm, y, ln)
+        y -= 4.8 * mm
+    y -= 6 * mm
+
+# encadré contact final
+y -= 2 * mm
+c.setFillColor(NAVY)
+c.roundRect(M, y - 30 * mm, W - 2 * M, 32 * mm, 4 * mm, fill=1, stroke=0)
+c.setFillColor(white)
+c.setFont('Helvetica-Bold', 13)
+c.drawCentredString(W / 2, y - 9 * mm, 'Un problème ? Une question ?')
+c.setFont('Helvetica', 11)
+c.setFillColor(HexColor('#c7c9d9'))
+c.drawCentredString(W / 2, y - 16 * mm, 'Écrivez-nous, nous répondons rapidement :')
+c.setFont('Helvetica-Bold', 14)
+c.setFillColor(white)
+c.drawCentredString(W / 2, y - 24 * mm, 'contact@cerydra.fr')
+
+
+c.showPage()
+
 
 c.save()
 print('OK ->', OUT)
