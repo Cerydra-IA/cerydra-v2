@@ -15,7 +15,7 @@ CERYDRA = système de réservation pour restaurants :
 | Quoi | Où | Compte |
 |---|---|---|
 | Code source | GitHub `Cerydra-IA/cerydra-v2` | compte GitHub perso |
-| App + widget (`app.cerydra.fr`) | Vercel (déploiement auto sur push `main`) | compte Vercel |
+| App + widget (`app.cerydra.fr`) | Netlify (déploiement auto sur push `main`) | compte Netlify |
 | Base de données, auth, Edge Functions | Supabase, projet `wuyltmbakpcvimqspqnb` | contact@cerydra.fr |
 | Emails automatiques | Make.com — scénarios : Cerydra Reservation, Cerydra Annulation, Rappel, Post-Visite | compte Make |
 | Envoi des emails | Gmail Google Workspace `contact@cerydra.fr` | admin Workspace |

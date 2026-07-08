@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # L'URL Supabase et la clé anon sont publiques par conception (shippées dans
+  # le widget côté navigateur) — le scanner de secrets ne doit pas les bloquer.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
