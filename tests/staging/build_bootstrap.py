@@ -18,12 +18,62 @@ RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 DUMP = os.path.join(RACINE, 'supabase', 'schema_complet.sql')
 SORTIE = os.path.join(RACINE, 'tests', 'staging', '01_bootstrap.sql')
 
+def decouper_instructions(sql):
+    """
+    Découpe le SQL en instructions.
+
+    Un simple split sur les lignes vides ou les « ; » ne marche pas : les corps
+    de fonctions contiennent les deux, entre délimiteurs $function$ … $function$.
+    On suit donc l'état du délimiteur. Particularité du dump : les définitions
+    de fonctions ne se terminent pas par « ; » (pg_get_functiondef n'en met
+    pas) — on ferme donc l'instruction sur le délimiteur de fin.
+    """
+    instructions, courante = [], []
+    i, n, tag = 0, len(sql), None
+    while i < n:
+        if tag:
+            if sql.startswith(tag, i):
+                courante.append(tag)
+                i += len(tag)
+                tag = None
+                texte = ''.join(courante).lstrip()
+                if re.match(r'CREATE\s+(OR\s+REPLACE\s+)?FUNCTION', texte, re.I):
+                    instructions.append(texte.strip() + ';')
+                    courante = []
+                continue
+            courante.append(sql[i]); i += 1
+            continue
+        m = re.match(r'\$[A-Za-z_]*\$', sql[i:])
+        if m:
+            tag = m.group(0)
+            courante.append(tag)
+            i += len(tag)
+            continue
+        if sql[i] == ';':
+            courante.append(';')
+            instructions.append(''.join(courante).strip())
+            courante = []
+            i += 1
+            continue
+        courante.append(sql[i]); i += 1
+    if ''.join(courante).strip():
+        instructions.append(''.join(courante).strip())
+    return [x for x in instructions if x.strip(';').strip()]
+
+
 src = open(DUMP, encoding='utf-8').read()
-blocs = [b.strip() for b in src.split('\n\n') if b.strip()]
+# L'export CSV a doublé les sauts de ligne : on les remet à un
+src = re.sub(r'\n{3,}', '\n\n', src.replace('\r\n', '\n'))
+src = re.sub(r'\n\n(?=\s*(declare|begin|end|if|else|return|set|where|and|select|update|from|values|create|alter)\b)',
+             '\n', src, flags=re.I)
+blocs = decouper_instructions(src)
 
 gardes, retires = [], []
 for b in blocs:
-    if b.startswith('--'):
+    # retire toutes les lignes de commentaire ET les lignes vides en tête,
+    # sinon un bloc précédé de plusieurs commentaires séparés serait jeté
+    b = re.sub(r'^(?:[ \t]*(?:--[^\n]*)?\n)+', '', b).strip()
+    if not b or b.startswith('--'):
         continue
     # On retire tout ce qui sort du staging vers l'extérieur
     if 'http_request' in b or 'hook.eu1.make.com' in b or '/functions/v1/' in b:
@@ -33,6 +83,18 @@ for b in blocs:
                      'CREATE OR REPLACE FUNCTION', 'CREATE FUNCTION', 'CREATE TRIGGER')):
         gardes.append(b)
 
+# Le dump ne garantit pas l'ordre à l'intérieur d'une catégorie : une clé
+# étrangère pouvait être créée avant la clé primaire qu'elle référence.
+# On réordonne : tables → PK/UNIQUE/CHECK → clés étrangères → le reste.
+def rang(b):
+    if b.startswith('CREATE TABLE'):
+        return 0
+    if 'ADD CONSTRAINT' in b:
+        return 2 if 'FOREIGN KEY' in b else 1
+    return 3
+
+gardes.sort(key=rang)
+
 # Idempotence : les tables et contraintes peuvent déjà exister
 out = []
 for b in gardes:
@@ -40,10 +102,19 @@ for b in gardes:
         b = b.replace('CREATE TABLE public.', 'CREATE TABLE IF NOT EXISTS public.', 1)
     if b.startswith('ALTER TABLE') and 'ADD CONSTRAINT' in b:
         nom = re.search(r'ADD CONSTRAINT (\S+)', b)
-        table = re.search(r'ALTER TABLE (\S+)', b)
-        if nom and table:
-            b = (f"DO $$ BEGIN\n  {b}\nEXCEPTION WHEN duplicate_table OR duplicate_object "
-                 f"THEN NULL; END $$;")
+        if nom:
+            # rejouable : on n'ajoute la contrainte que si elle n'existe pas
+            b = (f"DO $$ BEGIN\n"
+                 f"  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{nom.group(1)}') THEN\n"
+                 f"    {b}\n"
+                 f"  END IF;\n"
+                 f"END $$;")
+    # Le dump liste aussi les index qui portent les contraintes : ils existent
+    # déjà après la création de la PK/UNIQUE, d'où le IF NOT EXISTS.
+    if b.startswith('CREATE INDEX '):
+        b = b.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ', 1)
+    if b.startswith('CREATE UNIQUE INDEX '):
+        b = b.replace('CREATE UNIQUE INDEX ', 'CREATE UNIQUE INDEX IF NOT EXISTS ', 1)
     if b.startswith('CREATE TRIGGER'):
         nom = re.search(r'CREATE TRIGGER (\S+)', b).group(1)
         b = f"DROP TRIGGER IF EXISTS {nom} ON public.reservations;\n{b}"
