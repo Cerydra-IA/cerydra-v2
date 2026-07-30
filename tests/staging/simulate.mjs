@@ -112,6 +112,15 @@ for (let j = 1; j <= JOURS; j++) {
     const prenom = alea(PRENOMS)
     const nom = alea(NOMS)
     stats.tentees++
+
+    // Les réservations d'un même service n'arrivent pas dans la même minute :
+    // on étale les dates de création entre 1 h et 20 jours dans le passé.
+    // Sans cela, l'anti-spam (10 créations / 10 min) bloque tout — ce qui est
+    // le comportement attendu en production, mais fausserait la simulation.
+    // Le décalage se calcule par rapport à maintenant (et non à la date du
+    // service), sinon certaines créations retombent dans la fenêtre courante.
+    const creeLe = new Date(Date.now() - entier(60, 60 * 24 * 20) * 60000)
+
     const { error } = await supabase.from('reservations').insert({
       restaurant_id: resto.id,
       prenom,
@@ -123,6 +132,7 @@ for (let j = 1; j <= JOURS; j++) {
       nb_personnes: alea([1, 2, 2, 2, 3, 4, 4, 5, 6]),
       message: alea(MESSAGES),
       statut: 'confirmée',
+      created_at: creeLe.toISOString(),
     })
     if (error) {
       const code = (error.message.match(/[a-z_]{6,}/) || ['autre'])[0]
