@@ -101,15 +101,27 @@ function TableShape({ table, assignment, derived, selected, onTap, onDragStart, 
 
 // ─── Bandeau réservations à placer ───────────────────────────────────────────
 
-function BandeauAplacer({ reservations, onPlace }) {
-  if (!reservations.length) return null
+function BandeauAplacer({ reservations, aVenir = 0, onPlace }) {
+  if (!reservations.length) {
+    // Rien à placer aujourd'hui, mais des réservations arrivent : on le signale
+    // discrètement plutôt que de masquer complètement l'information.
+    if (!aVenir) return null
+    return (
+      <p className="text-xs text-gray-400 mb-4">
+        Aucune réservation à placer aujourd'hui · {aVenir} à venir les prochains jours
+      </p>
+    )
+  }
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
         <p className="text-sm font-semibold text-amber-800">
-          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer
+          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer aujourd'hui
         </p>
+        {aVenir > 0 && (
+          <span className="text-xs text-amber-600/70">· {aVenir} à venir les prochains jours</span>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
         {reservations.map((r) => (
@@ -805,7 +817,13 @@ export default function PlanDeSalle() {
   const resaDejaPlacees = new Set(
     Object.values(assignments).map((a) => a.reservation_id).filter(Boolean)
   )
-  const resasNonPlacees = reservations.filter((r) => !resaDejaPlacees.has(r.id))
+  // Le plan de salle est une vue du jour : le bandeau ne liste que les
+  // réservations d'aujourd'hui. Sans cela, un restaurant qui prend des
+  // réservations deux semaines à l'avance se retrouve avec des centaines de
+  // lignes illisibles au-dessus de son plan.
+  const nonPlacees = reservations.filter((r) => !resaDejaPlacees.has(r.id))
+  const resasNonPlacees = nonPlacees.filter((r) => r.date === today())
+  const resasAVenir = nonPlacees.length - resasNonPlacees.length
 
   // ── Rendu ────────────────────────────────────────────────────────────────────
 
@@ -900,6 +918,7 @@ export default function PlanDeSalle() {
         {!configMode && (
           <BandeauAplacer
             reservations={resasNonPlacees}
+            aVenir={resasAVenir}
             onPlace={(r) => {
               setResaEnCours((prev) => prev?.id === r.id ? null : r)
             }}

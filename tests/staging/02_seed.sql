@@ -44,7 +44,7 @@ BEGIN
     VALUES (rid, 'T' || n,
             CASE WHEN n <= 4 THEN 2 WHEN n <= 7 THEN 4 ELSE 6 END,
             CASE WHEN n % 2 = 0 THEN 'round' ELSE 'square' END,
-            'Salle',
+            'salle',
             15 + ((n - 1) % 4) * 22,
             25 + ((n - 1) / 4) * 30,
             90);
@@ -52,7 +52,7 @@ BEGIN
 
   FOR n IN 1..4 LOOP
     INSERT INTO plan_tables (restaurant_id, name, capacity, shape, zone, x_pct, y_pct, duration_minutes)
-    VALUES (rid, 'E' || n, 4, 'round', 'Terrasse', 20 + (n - 1) * 20, 40, 90);
+    VALUES (rid, 'E' || n, 4, 'round', 'terrasse', 20 + (n - 1) * 20, 40, 90);
   END LOOP;
 
   RAISE NOTICE 'Restaurant de test créé : % (slug chez-cerydra, 12 tables)', rid;
