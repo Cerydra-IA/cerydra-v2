@@ -15,11 +15,61 @@ const STATUS = {
 const TABLE_DEFAULT_DURATION = 90
 const CANVAS_H = 480
 
+// Fenêtres temporelles du plan de salle
+const RESERVEE_LEAD_MIN = 120   // une résa devient jaune 2 h avant l'heure
+const NO_SHOW_GRACE_MIN = 30    // puis « en retard » si personne ne s'installe
+const OCCUPEE_GRACE_MIN = 15    // libération auto : durée + 15 min
+
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
 function formatHeure(h) { return h?.slice(0, 5) || '' }
 
 function today() { return new Date().toISOString().split('T')[0] }
+
+function heureCourte(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * État affiché d'une table à l'instant `now`, calculé à partir de l'intention
+ * stockée (status) et des horodatages (started_at / service_at).
+ *
+ * Retourne { status, late?, upcoming?, expired?, at? } :
+ *   - expired  : la ligne en base est périmée, à libérer
+ *   - upcoming : réservation encore lointaine → la table est utilisable
+ *   - late     : l'heure est passée, le client ne s'est pas installé
+ */
+function deriveStatus(a, now = Date.now()) {
+  if (!a || a.status === 'libre') return { status: 'libre' }
+  if (a.status === 'bloquee') return { status: 'bloquee' }  // jamais automatique
+
+  const dureeMs = (a.duration_minutes || TABLE_DEFAULT_DURATION) * 60000
+
+  if (a.status === 'occupee') {
+    if (!a.started_at) return { status: 'occupee' }         // legacy : on respecte
+    const fin = new Date(a.started_at).getTime() + dureeMs + OCCUPEE_GRACE_MIN * 60000
+    if (now >= fin) return { status: 'libre', expired: true }
+    return { status: 'occupee', at: a.started_at }
+  }
+
+  if (a.status === 'reservee') {
+    if (!a.service_at) return { status: 'reservee' }        // legacy : on respecte
+    const t = new Date(a.service_at).getTime()
+    if (now < t - RESERVEE_LEAD_MIN * 60000) {
+      return { status: 'libre', upcoming: true, at: a.service_at }
+    }
+    if (now > t + dureeMs + (NO_SHOW_GRACE_MIN + 60) * 60000) {
+      return { status: 'libre', expired: true }
+    }
+    if (now > t + NO_SHOW_GRACE_MIN * 60000) {
+      return { status: 'reservee', late: true, at: a.service_at }
+    }
+    return { status: 'reservee', at: a.service_at }
+  }
+
+  return { status: a.status }
+}
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -36,9 +86,12 @@ function Toast({ message, type }) {
 
 // ─── TableShape ───────────────────────────────────────────────────────────────
 
-function TableShape({ table, assignment, selected, onTap, onDragStart, configMode }) {
-  const s = STATUS[assignment?.status || 'libre']
+function TableShape({ table, assignment, derived, selected, onTap, onDragStart, configMode }) {
+  const d = derived || { status: assignment?.status || 'libre' }
+  const s = STATUS[d.status] || STATUS.libre
   const sz = table.capacity <= 2 ? 52 : table.capacity <= 4 ? 64 : 78
+  // Réservation encore lointaine : la table reste verte, l'heure est rappelée
+  const showClient = d.status !== 'libre' && assignment?.client_name
 
   return (
     <div
@@ -52,6 +105,10 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
         transform: 'translate(-50%, -50%)',
         width: sz, height: sz,
         backgroundColor: s.bg,
+        // « en retard » : hachures pour alerter sans changer la couleur
+        backgroundImage: d.late
+          ? 'repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 5px, transparent 5px 10px)'
+          : undefined,
         border: `3px solid ${selected ? '#1a6bff' : s.ring}`,
         borderRadius: table.shape === 'round' ? '50%' : '12px',
         display: 'flex', flexDirection: 'column',
@@ -69,7 +126,7 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
       <span style={{ color: s.text, fontSize: 10, opacity: 0.85, marginTop: 2 }}>
         {table.capacity}p
       </span>
-      {assignment?.client_name && (
+      {showClient && (
         <span style={{
           color: s.text, fontSize: 9, opacity: 0.85,
           maxWidth: sz - 8, overflow: 'hidden',
@@ -78,9 +135,9 @@ function TableShape({ table, assignment, selected, onTap, onDragStart, configMod
           {assignment.client_name}
         </span>
       )}
-      {assignment?.notes && (
-        <span style={{ color: s.text, fontSize: 9, opacity: 0.75 }}>
-          {assignment.notes.split(' · ')[0]}
+      {d.at && (
+        <span style={{ color: s.text, fontSize: 9, opacity: d.upcoming ? 0.7 : 0.8 }}>
+          {d.late ? '⏳ ' : ''}{heureCourte(d.at)}
         </span>
       )}
     </div>
@@ -127,8 +184,9 @@ function BandeauAplacer({ reservations, onPlace }) {
 
 // ─── Modal service ────────────────────────────────────────────────────────────
 
-function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
-  const s = STATUS[assignment?.status || 'libre']
+function ServiceModal({ table, assignment, derived, pendingResa, onClose, onAction }) {
+  const d = derived || { status: assignment?.status || 'libre' }
+  const s = STATUS[d.status] || STATUS.libre
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -147,8 +205,10 @@ function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
               <p className="font-semibold text-[#1a1a2e]">{table.name} — {table.capacity} personnes</p>
               <p className="text-xs text-gray-400">
                 {s.label}
-                {assignment?.client_name ? ` · ${assignment.client_name}` : ''}
-                {assignment?.notes ? ` · ${assignment.notes.split(' · ')[0]}` : ''}
+                {d.late ? ' · en retard' : ''}
+                {d.upcoming ? ' · réservée plus tard' : ''}
+                {d.status !== 'libre' && assignment?.client_name ? ` · ${assignment.client_name}` : ''}
+                {d.at ? ` · ${heureCourte(d.at)}` : ''}
               </p>
             </div>
           </div>
@@ -183,7 +243,7 @@ function ServiceModal({ table, assignment, pendingResa, onClose, onAction }) {
         <div className="p-4 space-y-1.5">
           <p className="text-xs font-medium text-gray-400 mb-2 px-1">Changer le statut</p>
           {Object.entries(STATUS).map(([st, info]) => {
-            const isCurrent = (assignment?.status || 'libre') === st
+            const isCurrent = d.status === st
             return (
               <button
                 key={st}
@@ -445,6 +505,7 @@ export default function PlanDeSalle() {
   const [restoId, setRestoId] = useState(null)
   const [tables, setTables] = useState([])
   const [assignments, setAssignments] = useState({})     // table_id → assignment
+  const [now, setNow] = useState(() => Date.now())       // horloge du plan (tick 30 s)
   const [reservations, setReservations] = useState([])   // réservations du jour
   const [zone, setZone] = useState('salle')
   const [configMode, setConfigMode] = useState(false)
@@ -535,6 +596,48 @@ export default function PlanDeSalle() {
     return () => { supabase.removeChannel(channel) }
   }, [restoId])
 
+  // ── Horloge : recalcule les statuts affichés toutes les 30 s ────────────────
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Libération des tables périmées ──────────────────────────────────────────
+  // Filet côté client (effet immédiat à l'écran) — un job pg_cron fait le même
+  // travail toutes les 15 min même si personne n'a l'app ouverte, ce qui garde
+  // le calcul de capacité des réservations en ligne juste.
+
+  const sweeping = useRef(new Set())
+
+  useEffect(() => {
+    const perimees = Object.values(assignments).filter(
+      (a) => deriveStatus(a, now).expired && !sweeping.current.has(a.id)
+    )
+    if (perimees.length === 0) return
+
+    perimees.forEach((a) => sweeping.current.add(a.id))
+    const libre = {
+      status: 'libre', client_name: null, nb_persons: null,
+      reservation_id: null, notes: null, started_at: null, service_at: null,
+    }
+
+    supabase
+      .from('table_assignments')
+      .update(libre)
+      .in('id', perimees.map((a) => a.id))
+      .then(({ error }) => {
+        if (!error) {
+          setAssignments((prev) => {
+            const next = { ...prev }
+            for (const a of perimees) next[a.table_id] = { ...next[a.table_id], ...libre }
+            return next
+          })
+        }
+        perimees.forEach((a) => sweeping.current.delete(a.id))
+      })
+  }, [assignments, now])
+
   // ── Drag & drop ─────────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback((e, tableId) => {
@@ -584,6 +687,9 @@ export default function PlanDeSalle() {
       nb_persons: resa.nb_personnes,
       notes: `${formatHeure(resa.heure)}${resa.message ? ' · ' + resa.message : ''}` || null,
       status: 'reservee',
+      // horodatage du service prévu → sert au calcul de l'état affiché
+      service_at: new Date(`${resa.date}T${formatHeure(resa.heure)}:00`).toISOString(),
+      started_at: null,
       duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
 
@@ -643,6 +749,17 @@ export default function PlanDeSalle() {
         update.nb_persons = null
         update.reservation_id = null
         update.notes = null
+        update.started_at = null
+        update.service_at = null
+      }
+      if (value === 'occupee') {
+        // départ du chrono : sans lui la table resterait rouge indéfiniment
+        update.started_at = new Date().toISOString()
+        update.duration_minutes = table.duration_minutes || TABLE_DEFAULT_DURATION
+      }
+      if (value === 'bloquee') {
+        update.started_at = null
+        update.service_at = null
       }
 
       if (existing) {
@@ -674,6 +791,7 @@ export default function PlanDeSalle() {
       notes: form.notes,
       status: 'occupee',
       started_at: new Date().toISOString(),
+      service_at: null,
       duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
     if (existing) {
@@ -737,11 +855,15 @@ export default function PlanDeSalle() {
   // ── Rendu ────────────────────────────────────────────────────────────────────
 
   const visibleTables = tables.filter((t) => t.zone === zone)
+  // État affiché, recalculé à chaque tick d'horloge
+  const derivedByTable = {}
+  for (const t of tables) derivedByTable[t.id] = deriveStatus(assignments[t.id], now)
+
   const counts = {
-    libre:    visibleTables.filter((t) => !assignments[t.id] || assignments[t.id].status === 'libre').length,
-    reservee: visibleTables.filter((t) => assignments[t.id]?.status === 'reservee').length,
-    occupee:  visibleTables.filter((t) => assignments[t.id]?.status === 'occupee').length,
-    bloquee:  visibleTables.filter((t) => assignments[t.id]?.status === 'bloquee').length,
+    libre:    visibleTables.filter((t) => derivedByTable[t.id].status === 'libre').length,
+    reservee: visibleTables.filter((t) => derivedByTable[t.id].status === 'reservee').length,
+    occupee:  visibleTables.filter((t) => derivedByTable[t.id].status === 'occupee').length,
+    bloquee:  visibleTables.filter((t) => derivedByTable[t.id].status === 'bloquee').length,
   }
 
   if (loading) {
@@ -930,6 +1052,7 @@ export default function PlanDeSalle() {
                 key={table.id}
                 table={table}
                 assignment={assignments[table.id]}
+                derived={derivedByTable[table.id]}
                 selected={editModal?.id === table.id}
                 configMode={configMode}
                 onTap={() => handleTableTap(table)}
@@ -978,6 +1101,7 @@ export default function PlanDeSalle() {
         <ServiceModal
           table={serviceModal}
           assignment={assignments[serviceModal.id]}
+          derived={derivedByTable[serviceModal.id]}
           pendingResa={serviceModal._pendingResa || null}
           onClose={() => { setServiceModal(null); setResaEnCours(null) }}
           onAction={handleServiceAction}
