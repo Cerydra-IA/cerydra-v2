@@ -8,7 +8,8 @@
     "build": "node scripts/build-widget.mjs && node scripts/build-widget-annulation.mjs && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node tests/logic/planStatus.test.mjs"
+    "test": "node tests/logic/planStatus.test.mjs",
+    "simulate": "node tests/staging/simulate.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
