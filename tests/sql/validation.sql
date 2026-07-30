@@ -220,9 +220,12 @@ BEGIN
 
   -- ── 16. Anti-spam (au-delà de 10 créations / 10 min) ──────────────────────
   BEGIN
+    -- Une réservation par semaine sur le même jour d'ouverture : on évite
+    -- ainsi à la fois la limite de capacité et les jours de fermeture, pour
+    -- n'éprouver que l'anti-spam.
     INSERT INTO reservations(restaurant_id,prenom,nom,email,telephone,date,heure,nb_personnes,statut)
     SELECT rid,'Test','Spam'||n,'spam'||n||'@exemple.fr','0600000000',
-           jour_cible + (n / 2), h_valide + ((n % 2) * interval '90 minutes'),2,'confirmée'
+           jour_cible + (n * 7), h_valide, 2, 'confirmée'
       FROM generate_series(1,11) n;
     RAISE EXCEPTION '__ok__';
   EXCEPTION WHEN others THEN err := SQLERRM;
