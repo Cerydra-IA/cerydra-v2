@@ -37,8 +37,26 @@ function NouvelleResaModal({ restoId, onClose, onCreated }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [dispo, setDispo] = useState(null)
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+
+  // Disponibilité du créneau : on n'empêche rien (le restaurateur décide),
+  // on l'informe pour éviter de vendre deux fois la même table.
+  useEffect(() => {
+    if (!restoId || !form.date || !form.heure) { setDispo(null); return }
+    let annule = false
+    supabase
+      .rpc('creneau_disponibilite', {
+        p_restaurant_id: restoId,
+        p_date: form.date,
+        p_heure: form.heure.length === 5 ? `${form.heure}:00` : form.heure,
+      })
+      .then(({ data, error: err }) => {
+        if (!annule && !err && data && !data.erreur) setDispo(data)
+      })
+    return () => { annule = true }
+  }, [restoId, form.date, form.heure])
   const inputCls =
     'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1a1a2e] transition-colors'
 
@@ -102,6 +120,31 @@ function NouvelleResaModal({ restoId, onClose, onCreated }) {
             </select>
           </div>
           <textarea className={`${inputCls} resize-none`} rows={2} placeholder="Note (allergies, table préférée…)" value={form.message} onChange={set('message')} />
+
+          {/* Occupation du créneau — informatif, jamais bloquant */}
+          {dispo && dispo.tables_total > 0 && (
+            <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${
+              dispo.complet
+                ? 'bg-amber-50 border border-amber-200 text-amber-800'
+                : 'bg-gray-50 text-gray-500'
+            }`}>
+              <span>{dispo.complet ? '⚠️' : '🪑'}</span>
+              <span>
+                {dispo.complet ? (
+                  <>
+                    <b>Ce créneau est complet</b> ({dispo.tables_occupees}/{dispo.tables_total} tables occupées).
+                    Vous pouvez tout de même enregistrer cette réservation.
+                  </>
+                ) : (
+                  <>
+                    {dispo.restant} table{dispo.restant > 1 ? 's' : ''} encore disponible
+                    {dispo.restant > 1 ? 's' : ''} sur ce créneau ({dispo.tables_occupees}/{dispo.tables_total} occupées).
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           {error && (
             <p className="text-xs text-red-500 bg-red-50 rounded-xl px-3 py-2">{error}</p>
           )}
