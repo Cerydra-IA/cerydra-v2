@@ -290,6 +290,72 @@ BEGIN
     END IF;
   END;
 
+  -- ── 17 quater. Algorithme de placement (places, pas tables) ───────────────
+  BEGIN
+    DECLARE
+      echecs text := '';
+    BEGIN
+      -- 5 tables de 2 = 10 places : un groupe de 6 passe en assemblant 3 tables
+      IF NOT peut_placer(ARRAY[2,2,2,2,2], ARRAY[6]) THEN
+        echecs := echecs || 'assemblage de 3 tables refusé ; ';
+      END IF;
+      -- un groupe de 6 ne tient pas sur deux tables de 2 (4 places)
+      IF peut_placer(ARRAY[2,2], ARRAY[6]) THEN
+        echecs := echecs || '6 places trouvées sur 4 ; ';
+      END IF;
+      -- une table de 6 accueille un groupe de 6
+      IF NOT peut_placer(ARRAY[2,4,6], ARRAY[6]) THEN
+        echecs := echecs || 'table de 6 non utilisée ; ';
+      END IF;
+      -- on ne gaspille pas la grande table : 2+2 puis 6 doit passer
+      IF NOT peut_placer(ARRAY[2,2,6], ARRAY[6,2,2]) THEN
+        echecs := echecs || 'placement optimal manqué ; ';
+      END IF;
+      -- plus de table du tout
+      IF peut_placer(ARRAY[]::int[], ARRAY[2]) THEN
+        echecs := echecs || 'placement sans table ; ';
+      END IF;
+      -- salle pleine : 3 tables, 4 groupes
+      IF peut_placer(ARRAY[4,4,4], ARRAY[4,4,4,4]) THEN
+        echecs := echecs || '4 groupes sur 3 tables ; ';
+      END IF;
+
+      INSERT INTO resultats_tests VALUES (172,'Placement en places (peut_placer)',
+        'assemblage et refus corrects',
+        CASE WHEN echecs = '' THEN 'conforme' ELSE echecs END,
+        CASE WHEN echecs = '' THEN 'PASS' ELSE 'FAIL' END);
+    END;
+  EXCEPTION WHEN others THEN
+    INSERT INTO resultats_tests VALUES (172,'Placement en places (peut_placer)',
+      'assemblage et refus corrects', SQLERRM, 'FAIL');
+  END;
+
+  -- ── 17 quinquies. Un groupe trop grand est refusé ─────────────────────────
+  BEGIN
+    IF nb_tables = 0 THEN
+      INSERT INTO resultats_tests VALUES (173,'Groupe trop grand pour la salle',
+        'creneau_complet','ignoré (aucune table au plan)','SKIP');
+    ELSE
+      DECLARE places_totales int;
+      BEGIN
+        SELECT COALESCE(sum(capacity), 0) INTO places_totales
+          FROM plan_tables WHERE restaurant_id = rid;
+        -- on demande plus de couverts que la salle n'en contient
+        INSERT INTO reservations(restaurant_id,prenom,nom,email,telephone,date,heure,nb_personnes,statut)
+        VALUES (rid,'Test','Enorme','enorme@exemple.fr','0600000000',jour_cible,h_valide,
+                LEAST(places_totales + 10, COALESCE(couverts_max, 20)),'confirmée');
+        RAISE EXCEPTION '__ok__';
+      END;
+    END IF;
+  EXCEPTION WHEN others THEN
+    err := SQLERRM;
+    IF err <> '__ok__' OR true THEN
+      INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle',
+        'creneau_complet ou nb_personnes_invalide', err,
+        CASE WHEN err IN ('creneau_complet','nb_personnes_invalide') THEN 'PASS' ELSE 'FAIL' END);
+    END IF;
+  END;
+
   -- ── 18. Trigger d'annulation conditionné ──────────────────────────────────
   BEGIN
     IF EXISTS (

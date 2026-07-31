@@ -221,7 +221,11 @@ export default function RestoPublic() {
     let annule = false
     setChargementCreneaux(true)
     supabase
-      .rpc('creneaux_disponibilite', { p_restaurant_id: resto.id, p_date: form.date })
+      .rpc('creneaux_disponibilite', {
+        p_restaurant_id: resto.id,
+        p_date: form.date,
+        p_personnes: Number(form.nb_personnes) || 2,
+      })
       .then(({ data, error }) => {
         if (annule) return
         setChargementCreneaux(false)
@@ -236,7 +240,7 @@ export default function RestoPublic() {
         }
       })
     return () => { annule = true }
-  }, [resto?.id, form.date, horaires, fermetures])
+  }, [resto?.id, form.date, form.nb_personnes, horaires, fermetures])
 
   const slots = creneaux || []
   const slotsLibres = slots.filter((s) => s.disponible)
@@ -412,7 +416,9 @@ export default function RestoPublic() {
                 </div>
               ) : journeeComplete ? (
                 <div className={`${inputCls} text-orange-400 bg-orange-50 border-orange-100`}>
-                  Plus aucune disponibilité — essayez une autre date
+                  {Number(form.nb_personnes) > 2
+                    ? `Plus aucune table pour ${form.nb_personnes} personnes — essayez une autre date`
+                    : 'Plus aucune disponibilité — essayez une autre date'}
                 </div>
               ) : (
                 <select name="heure" value={form.heure} onChange={handleChange}

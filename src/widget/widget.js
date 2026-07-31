@@ -484,7 +484,12 @@
       const alert = shadow.getElementById('crd-alert')
       const submitBtn = shadow.getElementById('crd-submit-btn')
 
-      dateInput.addEventListener('change', async () => {
+      const personnesSelect = form.querySelector('select[name="nb_personnes"]')
+
+      // La disponibilité dépend de la taille du groupe : un créneau peut être
+      // libre pour 2 personnes et complet pour 6. On recalcule donc aussi
+      // quand le nombre de couverts change.
+      const rafraichirCreneaux = async () => {
         if (!dateInput.value) {
           heurePlaceholder.style.display = ''
           heureSelect.style.display = 'none'
@@ -503,6 +508,7 @@
           creneaux = await sbRpc('creneaux_disponibilite', {
             p_restaurant_id: resto.id,
             p_date: dateInput.value,
+            p_personnes: Number(personnesSelect?.value || 2),
           })
         } catch (_) {
           // Si l'appel échoue, on retombe sur le calcul local : mieux vaut
@@ -523,8 +529,11 @@
 
         const libres = creneaux.filter((c) => c.disponible)
         if (libres.length === 0) {
+          const nb = Number(personnesSelect?.value || 2)
           alert.className = 'crd-alert warn'
-          alert.textContent = 'Plus aucune disponibilité ce jour-là. Essayez une autre date.'
+          alert.textContent = nb > 2
+            ? `Plus aucune table disponible pour ${nb} personnes ce jour-là. Essayez une autre date.`
+            : 'Plus aucune disponibilité ce jour-là. Essayez une autre date.'
           alert.style.display = 'block'
           submitBtn.disabled = true
           heureSelect.style.display = 'none'
@@ -541,6 +550,16 @@
           }).join('')
         heurePlaceholder.style.display = 'none'
         heureSelect.style.display = 'block'
+      }
+
+      dateInput.addEventListener('change', rafraichirCreneaux)
+      personnesSelect?.addEventListener('change', () => {
+        // on garde l'horaire choisi s'il reste disponible
+        const choisi = heureSelect.value
+        rafraichirCreneaux().then(() => {
+          const opt = [...heureSelect.options].find((o) => o.value === choisi && !o.disabled)
+          if (opt) heureSelect.value = choisi
+        })
       })
 
       form.addEventListener('submit', async (e) => {

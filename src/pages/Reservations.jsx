@@ -51,12 +51,13 @@ function NouvelleResaModal({ restoId, onClose, onCreated }) {
         p_restaurant_id: restoId,
         p_date: form.date,
         p_heure: form.heure.length === 5 ? `${form.heure}:00` : form.heure,
+        p_personnes: Number(form.nb_personnes) || 2,
       })
       .then(({ data, error: err }) => {
         if (!annule && !err && data && !data.erreur) setDispo(data)
       })
     return () => { annule = true }
-  }, [restoId, form.date, form.heure])
+  }, [restoId, form.date, form.heure, form.nb_personnes])
   const inputCls =
     'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1a1a2e] transition-colors'
 
@@ -132,7 +133,8 @@ function NouvelleResaModal({ restoId, onClose, onCreated }) {
               <span>
                 {dispo.complet ? (
                   <>
-                    <b>Ce créneau est complet</b> ({dispo.tables_occupees}/{dispo.tables_total} tables occupées).
+                    <b>Aucune table disponible pour {form.nb_personnes} personne{form.nb_personnes > 1 ? 's' : ''}</b>{' '}
+                    sur ce créneau ({dispo.tables_occupees}/{dispo.tables_total} tables occupées).
                     Vous pouvez tout de même enregistrer cette réservation.
                   </>
                 ) : (
