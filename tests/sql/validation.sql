@@ -89,6 +89,12 @@ BEGIN
   BEGIN
     IF nb_tables = 0 THEN
       INSERT INTO resultats_tests VALUES (4,'Rotation créneau suivant','accepté','ignoré','SKIP');
+    ELSIF EXISTS (SELECT 1 FROM reservations
+                   WHERE restaurant_id = rid AND date = jour_cible AND statut <> 'annulée') THEN
+      -- des réservations existent déjà ce jour-là : le créneau peut être
+      -- légitimement plein, le test ne prouverait rien
+      INSERT INTO resultats_tests VALUES (4,'Rotation créneau suivant','accepté',
+        'ignoré (journée déjà réservée)','SKIP');
     ELSE
       INSERT INTO reservations(restaurant_id,prenom,nom,email,telephone,date,heure,nb_personnes,statut)
       SELECT rid,'Test','Rot'||n,'rot'||n||'@exemple.fr','0600000000',jour_cible,h_valide,2,'confirmée'
@@ -330,35 +336,39 @@ BEGIN
       'assemblage et refus corrects', SQLERRM, 'FAIL');
   END;
 
-  -- ── 17 quinquies. Un groupe trop grand est refusé ─────────────────────────
+  -- ── 17 quinquies. Un groupe plus grand que la salle est refusé ───────────
+  -- On interroge directement la fonction : le trigger ne peut pas servir ici,
+  -- car nb_couverts_max plafonne la taille du groupe bien avant la salle.
   BEGIN
     IF nb_tables = 0 THEN
-      INSERT INTO resultats_tests VALUES (173,'Groupe trop grand pour la salle',
-        'creneau_complet','ignoré (aucune table au plan)','SKIP');
+      INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle',
+        'refusé','ignoré (aucune table au plan)','SKIP');
     ELSE
       DECLARE places_totales int;
       BEGIN
         SELECT COALESCE(sum(capacity), 0) INTO places_totales
           FROM plan_tables WHERE restaurant_id = rid;
-        -- on demande plus de couverts que la salle n'en contient
-        INSERT INTO reservations(restaurant_id,prenom,nom,email,telephone,date,heure,nb_personnes,statut)
-        VALUES (rid,'Test','Enorme','enorme@exemple.fr','0600000000',jour_cible,h_valide,
-                LEAST(places_totales + 10, COALESCE(couverts_max, 20)),'confirmée');
-        RAISE EXCEPTION '__ok__';
+        IF creneau_peut_accueillir(rid, jour_cible, h_valide, places_totales + 10) THEN
+          INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle',
+            'refusé', 'accepté (' || (places_totales + 10) || ' couverts pour '
+            || places_totales || ' places)','FAIL');
+        ELSE
+          INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle',
+            'refusé', 'refusé (' || places_totales || ' places en salle)','PASS');
+        END IF;
       END;
     END IF;
   EXCEPTION WHEN others THEN
-    err := SQLERRM;
-    IF err <> '__ok__' OR true THEN
-      INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle',
-        'creneau_complet ou nb_personnes_invalide', err,
-        CASE WHEN err IN ('creneau_complet','nb_personnes_invalide') THEN 'PASS' ELSE 'FAIL' END);
-    END IF;
+    INSERT INTO resultats_tests VALUES (173,'Groupe plus grand que la salle','refusé',SQLERRM,'FAIL');
   END;
 
   -- ── 18. Trigger d'annulation conditionné ──────────────────────────────────
   BEGIN
-    IF EXISTS (
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'annulation_reservation') THEN
+      -- staging : les webhooks sont volontairement absents
+      INSERT INTO resultats_tests VALUES (18,'Webhook annulation conditionné','WHEN statut=annulée',
+        'ignoré (aucun webhook sur cet environnement)','SKIP');
+    ELSIF EXISTS (
       SELECT 1 FROM pg_trigger
        WHERE tgname = 'annulation_reservation'
          AND pg_get_triggerdef(oid) LIKE '%WHEN%annulée%'

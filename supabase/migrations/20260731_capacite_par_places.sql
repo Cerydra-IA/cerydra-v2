@@ -15,6 +15,15 @@
 -- groupe. Un créneau peut être libre pour 2 personnes et complet pour 6 ; les
 -- fonctions d'affichage prennent donc un paramètre p_personnes.
 
+-- ── 0. Retrait des anciennes signatures ────────────────────────────────────
+-- Les nouvelles fonctions prennent un paramètre p_personnes avec valeur par
+-- défaut. Sans ce nettoyage, l'ancienne version et la nouvelle coexistent :
+-- un appel à 3 arguments devient ambigu et Postgres refuse de choisir
+-- (« function ... is not unique ») — le widget cesserait d'afficher
+-- les créneaux.
+DROP FUNCTION IF EXISTS creneau_disponibilite(uuid, date, time);
+DROP FUNCTION IF EXISTS creneaux_disponibilite(uuid, date);
+
 -- ── 1. Placement d'une liste de groupes sur une liste de tables ─────────────
 CREATE OR REPLACE FUNCTION peut_placer(caps int[], groupes int[])
 RETURNS boolean AS $$
