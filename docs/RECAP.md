@@ -100,4 +100,4 @@ si modifiés, recopier le zip CERYDRA sur la clé USB.
 - Make : surveiller le quota d'opérations ; notifications d'erreur activées ; module Gmail AVANT Calendar
   dans le scénario Annulation ; filtre "email non vide" pour les résas manuelles sans email
 - Push iOS : nécessite la PWA installée + permission ; indicateur d'état à ajouter un jour
-- Créneaux pleins non grisés dans le widget (le client voit l'erreur après validation) — amélioration future
+- Créneaux complets et trop proches : grisés dans le widget et la page publique (creneaux_disponibilite)

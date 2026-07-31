@@ -245,6 +245,51 @@ BEGIN
     INSERT INTO resultats_tests VALUES (17,'creneau_disponibilite()','compteurs',SQLERRM,'FAIL');
   END;
 
+  -- ── 17 bis. Créneaux du jour : cohérence avec les horaires ────────────────
+  BEGIN
+    DECLARE
+      creneaux json;
+      n_creneaux int;
+      dernier time;
+    BEGIN
+      creneaux := creneaux_disponibilite(rid, jour_cible);
+      SELECT count(*), max((value->>'heure')::time)
+        INTO n_creneaux, dernier
+        FROM json_array_elements(creneaux);
+
+      IF n_creneaux = 0 THEN
+        INSERT INTO resultats_tests VALUES (170,'creneaux_disponibilite()','créneaux du samedi',
+          'aucun créneau','FAIL');
+      ELSIF dernier > h_valide - interval '1 second' AND dernier <= h_tardive THEN
+        INSERT INTO resultats_tests VALUES (170,'creneaux_disponibilite()',
+          'dernière arrivée ≤ fermeture - 1 h',
+          n_creneaux || ' créneaux, dernier à ' || dernier,'PASS');
+      ELSE
+        INSERT INTO resultats_tests VALUES (170,'creneaux_disponibilite()',
+          'dernière arrivée ≤ fermeture - 1 h',
+          'dernier créneau à ' || dernier,'FAIL');
+      END IF;
+    END;
+  EXCEPTION WHEN others THEN
+    INSERT INTO resultats_tests VALUES (170,'creneaux_disponibilite()','créneaux du jour',SQLERRM,'FAIL');
+  END;
+
+  -- ── 17 ter. Aucun créneau un jour de fermeture exceptionnelle ─────────────
+  BEGIN
+    INSERT INTO fermetures(restaurant_id, date, motif) VALUES (rid, jour_cible, 'test');
+    IF json_array_length(creneaux_disponibilite(rid, jour_cible)) = 0 THEN
+      INSERT INTO resultats_tests VALUES (171,'Créneaux un jour de fermeture','aucun','aucun','PASS');
+    ELSE
+      INSERT INTO resultats_tests VALUES (171,'Créneaux un jour de fermeture','aucun',
+        'des créneaux sont proposés','FAIL');
+    END IF;
+    RAISE EXCEPTION '__rollback__';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM <> '__rollback__' THEN
+      INSERT INTO resultats_tests VALUES (171,'Créneaux un jour de fermeture','aucun',SQLERRM,'FAIL');
+    END IF;
+  END;
+
   -- ── 18. Trigger d'annulation conditionné ──────────────────────────────────
   BEGIN
     IF EXISTS (

@@ -26,6 +26,21 @@
     return res.json()
   }
 
+  // Disponibilité de tous les créneaux d'une date, en un appel
+  async function sbRpc(fn, args) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(args),
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  }
+
   async function sbPost(table, body) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: 'POST',
@@ -469,29 +484,61 @@
       const alert = shadow.getElementById('crd-alert')
       const submitBtn = shadow.getElementById('crd-submit-btn')
 
-      dateInput.addEventListener('change', () => {
-        const s = fermetures.includes(dateInput.value)
-          ? []
-          : getSlotsForDate(horaires, dateInput.value)
+      dateInput.addEventListener('change', async () => {
         if (!dateInput.value) {
           heurePlaceholder.style.display = ''
           heureSelect.style.display = 'none'
           alert.style.display = 'none'
           return
         }
-        if (s.length === 0) {
-          heurePlaceholder.style.display = ''
-          heureSelect.style.display = 'none'
+
+        // Repli local le temps de la réponse serveur
+        heurePlaceholder.value = ''
+        heurePlaceholder.setAttribute('placeholder', 'Recherche des disponibilités…')
+        heurePlaceholder.style.display = ''
+        heureSelect.style.display = 'none'
+
+        let creneaux = null
+        try {
+          creneaux = await sbRpc('creneaux_disponibilite', {
+            p_restaurant_id: resto.id,
+            p_date: dateInput.value,
+          })
+        } catch (_) {
+          // Si l'appel échoue, on retombe sur le calcul local : mieux vaut
+          // proposer tous les créneaux que bloquer la réservation.
+          creneaux = getSlotsForDate(horaires, dateInput.value)
+            .map((t) => ({ heure: t, disponible: true }))
+        }
+
+        heurePlaceholder.setAttribute('placeholder', "Sélectionnez d'abord une date")
+
+        if (!creneaux || creneaux.length === 0) {
           alert.className = 'crd-alert warn'
           alert.textContent = 'Le restaurant est fermé ce jour-là.'
           alert.style.display = 'block'
           submitBtn.disabled = true
           return
         }
+
+        const libres = creneaux.filter((c) => c.disponible)
+        if (libres.length === 0) {
+          alert.className = 'crd-alert warn'
+          alert.textContent = 'Plus aucune disponibilité ce jour-là. Essayez une autre date.'
+          alert.style.display = 'block'
+          submitBtn.disabled = true
+          heureSelect.style.display = 'none'
+          return
+        }
+
         alert.style.display = 'none'
         submitBtn.disabled = false
         heureSelect.innerHTML = '<option value="">Choisir un horaire</option>' +
-          s.map(t => `<option value="${t}">${t}</option>`).join('')
+          creneaux.map((c) => {
+            if (c.disponible) return `<option value="${esc(c.heure)}">${esc(c.heure)}</option>`
+            const motif = c.trop_tot ? 'trop proche' : 'complet'
+            return `<option value="" disabled>${esc(c.heure)} — ${motif}</option>`
+          }).join('')
         heurePlaceholder.style.display = 'none'
         heureSelect.style.display = 'block'
       })

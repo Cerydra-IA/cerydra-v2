@@ -210,10 +210,36 @@ export default function RestoPublic() {
     load()
   }, [slug])
 
-  const slots = useMemo(
-    () => (fermetures.includes(form.date) ? [] : getSlotsForDate(horaires, form.date)),
-    [horaires, fermetures, form.date]
-  )
+  // Créneaux calculés côté serveur : ils portent la disponibilité réelle
+  // (capacité + délai minimum), ce qui évite au client de découvrir un refus
+  // après avoir rempli tout le formulaire.
+  const [creneaux, setCreneaux] = useState(null)
+  const [chargementCreneaux, setChargementCreneaux] = useState(false)
+
+  useEffect(() => {
+    if (!resto?.id || !form.date) { setCreneaux(null); return }
+    let annule = false
+    setChargementCreneaux(true)
+    supabase
+      .rpc('creneaux_disponibilite', { p_restaurant_id: resto.id, p_date: form.date })
+      .then(({ data, error }) => {
+        if (annule) return
+        setChargementCreneaux(false)
+        // En cas d'échec, repli sur le calcul local plutôt que de bloquer
+        if (error || !data) {
+          const locaux = fermetures.includes(form.date)
+            ? []
+            : getSlotsForDate(horaires, form.date)
+          setCreneaux(locaux.map((h) => ({ heure: h, disponible: true })))
+        } else {
+          setCreneaux(data)
+        }
+      })
+    return () => { annule = true }
+  }, [resto?.id, form.date, horaires, fermetures])
+
+  const slots = creneaux || []
+  const slotsLibres = slots.filter((s) => s.disponible)
 
   // Quand la date change, reset l'heure si le slot actuel n'est plus disponible
   const handleDateChange = (val) => {
@@ -271,7 +297,8 @@ export default function RestoPublic() {
   if (confirmed) return <Confirmation resto={resto} form={form} isWidget={isWidget} />
 
   const minDate = getMinDate(resto.delai_minimum_heures)
-  const jourFerme = form.date && slots.length === 0
+  const jourFerme = form.date && !chargementCreneaux && creneaux !== null && slots.length === 0
+  const journeeComplete = form.date && slots.length > 0 && slotsLibres.length === 0
 
   return (
     <div
@@ -375,16 +402,26 @@ export default function RestoPublic() {
                 <div className={`${inputCls} text-gray-300 cursor-not-allowed`}>
                   Sélectionnez d'abord une date
                 </div>
+              ) : chargementCreneaux ? (
+                <div className={`${inputCls} text-gray-300`}>
+                  Recherche des disponibilités…
+                </div>
               ) : jourFerme ? (
                 <div className={`${inputCls} text-orange-400 bg-orange-50 border-orange-100`}>
                   Le restaurant est fermé ce jour-là
+                </div>
+              ) : journeeComplete ? (
+                <div className={`${inputCls} text-orange-400 bg-orange-50 border-orange-100`}>
+                  Plus aucune disponibilité — essayez une autre date
                 </div>
               ) : (
                 <select name="heure" value={form.heure} onChange={handleChange}
                   required className={inputCls}>
                   <option value="">Choisir un horaire</option>
                   {slots.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s.heure} value={s.disponible ? s.heure : ''} disabled={!s.disponible}>
+                      {s.heure}{s.disponible ? '' : s.trop_tot ? ' — trop proche' : ' — complet'}
+                    </option>
                   ))}
                 </select>
               )}
