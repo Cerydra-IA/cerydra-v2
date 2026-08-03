@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/dashboard/Navbar'
-import { deriveStatus, TABLE_DEFAULT_DURATION } from '../lib/planStatus'
+import { deriveStatus, serviceAuMoment, nombreServices, TABLE_DEFAULT_DURATION } from '../lib/planStatus'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -47,10 +47,12 @@ function Toast({ message, type }) {
 
 // ─── TableShape ───────────────────────────────────────────────────────────────
 
-function TableShape({ table, assignment, derived, selected, onTap, onDragStart, configMode }) {
+function TableShape({ table, assignment, derived, nbServices = 0, selected, onTap, onDragStart, configMode }) {
   const d = derived || { status: assignment?.status || 'libre' }
   const s = STATUS[d.status] || STATUS.libre
   const sz = table.capacity <= 2 ? 52 : table.capacity <= 4 ? 64 : 78
+  // Plusieurs tournées dans la journée : on le signale d'un coup d'œil
+  const plusieursServices = !configMode && nbServices > 1
   // Réservation encore lointaine : la table reste verte, l'heure est rappelée
   const showClient = d.status !== 'libre' && assignment?.client_name
 
@@ -99,6 +101,21 @@ function TableShape({ table, assignment, derived, selected, onTap, onDragStart, 
       {d.at && (
         <span style={{ color: s.text, fontSize: 9, opacity: d.upcoming ? 0.7 : 0.8 }}>
           {d.late ? '⏳ ' : ''}{heureCourte(d.at)}
+        </span>
+      )}
+      {plusieursServices && (
+        <span
+          title={`${nbServices} services dans la journée`}
+          style={{
+            position: 'absolute', top: -4, right: -4,
+            minWidth: 17, height: 17, padding: '0 4px',
+            borderRadius: 9, background: '#1a1a2e', color: '#fff',
+            fontSize: 9, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '2px solid #fff',
+          }}
+        >
+          ×{nbServices}
         </span>
       )}
     </div>
@@ -477,7 +494,9 @@ export default function PlanDeSalle() {
   const { user } = useAuth()
   const [restoId, setRestoId] = useState(null)
   const [tables, setTables] = useState([])
-  const [assignments, setAssignments] = useState({})     // table_id → assignment
+  const [services, setServices] = useState([])           // services du jour, toutes tables
+  const [horaires, setHoraires] = useState([])           // pour construire les créneaux
+  const [heureVue, setHeureVue] = useState(null)         // moment affiché (HH:MM)
   const [now, setNow] = useState(() => Date.now())       // horloge du plan (tick 30 s)
   const [dateVue, setDateVue] = useState(() => today())  // journée affichée
   const [reservations, setReservations] = useState([])   // réservations du jour
@@ -518,11 +537,12 @@ export default function PlanDeSalle() {
     if (!resto) { setLoading(false); return }
     setRestoId(resto.id)
 
-    const [{ data: tablesData }, { data: assignData }, { data: resaData }] = await Promise.all([
+    const [{ data: tablesData }, { data: assignData }, { data: horairesData }, { data: resaData }] = await Promise.all([
       supabase.from('plan_tables').select('*').eq('restaurant_id', resto.id).order('name'),
       supabase.from('table_assignments').select('*')
         .eq('restaurant_id', resto.id)
         .eq('service_date', dateVue),
+      supabase.from('horaires').select('*').eq('restaurant_id', resto.id),
       supabase.from('reservations')
         .select('*')
         .eq('restaurant_id', resto.id)
@@ -537,9 +557,8 @@ export default function PlanDeSalle() {
     setTables(tablesData || [])
     setReservations(resaData || [])
 
-    const map = {}
-    for (const a of assignData || []) map[a.table_id] = a
-    setAssignments(map)
+    setHoraires(horairesData || [])
+    setServices(assignData || [])
     setLoading(false)
   }
 
@@ -554,9 +573,9 @@ export default function PlanDeSalle() {
         filter: `restaurant_id=eq.${restoId}`,
       }, (payload) => {
         if (payload.eventType === 'DELETE') {
-          setAssignments((prev) => { const n = { ...prev }; delete n[payload.old.table_id]; return n })
+          setServices((prev) => prev.filter((a) => a.id !== payload.old.id))
         } else if (payload.new.service_date === dateVue) {
-          setAssignments((prev) => ({ ...prev, [payload.new.table_id]: payload.new }))
+          setServices((prev) => [...prev.filter((a) => a.id !== payload.new.id), payload.new])
         }
       })
       .on('postgres_changes', {
@@ -573,6 +592,42 @@ export default function PlanDeSalle() {
 
     return () => { supabase.removeChannel(channel) }
   }, [restoId, dateVue])
+
+  // ── Créneaux du jour affiché ───────────────────────────────────────────────
+  // Le plan montre la salle à un instant précis : sans cela, impossible de
+  // distinguer la tournée de 19 h de celle de 21 h sur la même table.
+  const JOURS_SEM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+
+  const creneauxJour = (() => {
+    const h = horaires.find(
+      (x) => x.jour === JOURS_SEM[new Date(dateVue + 'T12:00:00').getDay()]
+    )
+    if (!h || !h.ouvert) return []
+    const out = []
+    for (const [debut, fin] of [[h.midi_debut, h.midi_fin], [h.soir_debut, h.soir_fin]]) {
+      if (!debut || !fin) continue
+      const [hd, md] = debut.split(':').map(Number)
+      const [hf, mf] = fin.split(':').map(Number)
+      for (let m = hd * 60 + md; m <= hf * 60 + mf - 30; m += 30) {
+        out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+      }
+    }
+    return out
+  })()
+
+  // Par défaut : l'heure courante si l'on est dans un service, sinon le début
+  // du prochain service de la journée.
+  useEffect(() => {
+    if (creneauxJour.length === 0) { setHeureVue(null); return }
+    if (heureVue && creneauxJour.includes(heureVue)) return
+    if (estAujourdhui) {
+      const maintenant = new Date().toTimeString().slice(0, 5)
+      const suivant = creneauxJour.find((c) => c >= maintenant)
+      setHeureVue(suivant || creneauxJour[creneauxJour.length - 1])
+    } else {
+      setHeureVue(creneauxJour[0])
+    }
+  }, [horaires, dateVue])
 
   // ── Horloge : recalcule les statuts affichés toutes les 30 s ────────────────
 
@@ -592,32 +647,23 @@ export default function PlanDeSalle() {
     // Uniquement sur la journée en cours : sur un autre jour, on consulte une
     // préparation, il n'y a rien à libérer.
     if (dateVue !== today()) return
-    const perimees = Object.values(assignments).filter(
+    const perimees = services.filter(
       (a) => deriveStatus(a, now).expired && !sweeping.current.has(a.id)
     )
     if (perimees.length === 0) return
 
     perimees.forEach((a) => sweeping.current.add(a.id))
-    const libre = {
-      status: 'libre', client_name: null, nb_persons: null,
-      reservation_id: null, notes: null, started_at: null, service_at: null,
-    }
+    const ids = perimees.map((a) => a.id)
 
     supabase
       .from('table_assignments')
-      .update(libre)
-      .in('id', perimees.map((a) => a.id))
+      .delete()
+      .in('id', ids)
       .then(({ error }) => {
-        if (!error) {
-          setAssignments((prev) => {
-            const next = { ...prev }
-            for (const a of perimees) next[a.table_id] = { ...next[a.table_id], ...libre }
-            return next
-          })
-        }
-        perimees.forEach((a) => sweeping.current.delete(a.id))
+        if (!error) setServices((prev) => prev.filter((a) => !ids.includes(a.id)))
+        ids.forEach((id) => sweeping.current.delete(id))
       })
-  }, [assignments, now, dateVue])
+  }, [services, now, dateVue])
 
   // ── Drag & drop ─────────────────────────────────────────────────────────────
 
@@ -659,7 +705,12 @@ export default function PlanDeSalle() {
   // ── Lier une réservation à une table ────────────────────────────────────────
 
   const linkResaToTable = async (table, resa) => {
-    const existing = assignments[table.id]
+    const serviceAt = new Date(`${resa.date}T${formatHeure(resa.heure)}:00`).toISOString()
+    // Une table peut recevoir plusieurs tournées : on ajoute un service,
+    // sauf s'il en existe déjà un à la même heure (on le remplace alors).
+    const existant = (servicesParTable[table.id] || []).find(
+      (a) => a.service_at && new Date(a.service_at).getTime() === new Date(serviceAt).getTime()
+    )
     const payload = {
       restaurant_id: restoId,
       table_id: table.id,
@@ -667,24 +718,25 @@ export default function PlanDeSalle() {
       reservation_id: resa.id,
       client_name: `${resa.prenom} ${resa.nom}`,
       nb_persons: resa.nb_personnes,
-      notes: `${formatHeure(resa.heure)}${resa.message ? ' · ' + resa.message : ''}` || null,
+      notes: resa.message || null,
       status: 'reservee',
-      // horodatage du service prévu → sert au calcul de l'état affiché
-      service_at: new Date(`${resa.date}T${formatHeure(resa.heure)}:00`).toISOString(),
+      service_at: serviceAt,
       started_at: null,
       duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
 
-    if (existing) {
-      const { error } = await supabase.from('table_assignments').update(payload).eq('id', existing.id)
-      if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...payload } }))
+    if (existant) {
+      const { error } = await supabase.from('table_assignments').update(payload).eq('id', existant.id)
+      if (!error) setServices((prev) => prev.map((a) => a.id === existant.id ? { ...a, ...payload } : a))
     } else {
       const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
-      if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
+      if (!error && data) setServices((prev) => [...prev, data])
+      else if (error) { showToast('Erreur : ' + error.message, 'error'); return }
     }
 
     setResaEnCours(null)
-    showToast(`${table.name} assignée à ${resa.prenom} ${resa.nom}`)
+    setHeureVue(formatHeure(resa.heure))
+    showToast(`${table.name} — ${resa.prenom} ${resa.nom} à ${formatHeure(resa.heure)}`)
   }
 
   // ── Tap sur une table (mode service) ────────────────────────────────────────
@@ -724,34 +776,62 @@ export default function PlanDeSalle() {
     }
 
     if (action === 'status') {
-      const existing = assignments[table.id]
-      const update = { status: value }
+      const courant = assignments[table.id]        // service affiché
+      const liste = servicesParTable[table.id] || []
+      const momentIso = new Date(`${dateVue}T${heureVue || '19:00'}:00`).toISOString()
+
+      // « Libre » = le service n'existe plus. L'absence de ligne vaut
+      // disponibilité, ce qui évite d'accumuler des lignes vides.
       if (value === 'libre') {
-        update.client_name = null
-        update.nb_persons = null
-        update.reservation_id = null
-        update.notes = null
-        update.started_at = null
-        update.service_at = null
+        if (courant) {
+          const { error } = await supabase.from('table_assignments').delete().eq('id', courant.id)
+          if (!error) setServices((prev) => prev.filter((a) => a.id !== courant.id))
+        }
+        setServiceModal(null)
+        showToast(`${table.name} → Libre`)
+        return
       }
+
+      // Un blocage vaut pour la journée entière (service_at nul)
+      if (value === 'bloquee') {
+        const blocage = liste.find((a) => !a.service_at)
+        if (blocage) {
+          const { error } = await supabase.from('table_assignments')
+            .update({ status: 'bloquee' }).eq('id', blocage.id)
+          if (!error) setServices((prev) => prev.map((a) => a.id === blocage.id ? { ...a, status: 'bloquee' } : a))
+        } else {
+          const { data, error } = await supabase.from('table_assignments').insert({
+            restaurant_id: restoId, table_id: table.id, service_date: dateVue,
+            status: 'bloquee', service_at: null,
+          }).select().single()
+          if (!error && data) setServices((prev) => [...prev, data])
+          else if (error) { showToast('Erreur : ' + error.message, 'error'); return }
+        }
+        setServiceModal(null)
+        showToast(`${table.name} → Bloquée`)
+        return
+      }
+
+      // Occupée / Réservée : on met à jour le service affiché, ou on en crée
+      // un à l'heure sélectionnée.
+      const update = { status: value }
       if (value === 'occupee') {
-        // départ du chrono : sans lui la table resterait rouge indéfiniment
         update.started_at = new Date().toISOString()
         update.duration_minutes = table.duration_minutes || TABLE_DEFAULT_DURATION
       }
-      if (value === 'bloquee') {
-        update.started_at = null
-        update.service_at = null
-      }
 
-      if (existing) {
-        const { error } = await supabase.from('table_assignments').update(update).eq('id', existing.id)
-        if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...update } }))
+      if (courant && courant.service_at) {
+        const { error } = await supabase.from('table_assignments').update(update).eq('id', courant.id)
+        if (!error) setServices((prev) => prev.map((a) => a.id === courant.id ? { ...a, ...update } : a))
       } else {
         const { data, error } = await supabase.from('table_assignments').insert({
-          restaurant_id: restoId, table_id: table.id, service_date: dateVue, ...update,
+          restaurant_id: restoId, table_id: table.id, service_date: dateVue,
+          service_at: momentIso,
+          duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
+          ...update,
         }).select().single()
-        if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
+        if (!error && data) setServices((prev) => [...prev, data])
+        else if (error) { showToast('Erreur : ' + error.message, 'error'); return }
       }
 
       setServiceModal(null)
@@ -764,7 +844,12 @@ export default function PlanDeSalle() {
   const handleAssignSave = async (form) => {
     const table = assignModal
     if (!table) return
-    const existing = assignments[table.id]
+    // Un client sans réservation occupe la table à partir de maintenant
+    // (ou de l'heure consultée si l'on prépare un autre service).
+    const serviceAt = estAujourdhui
+      ? new Date().toISOString()
+      : new Date(`${dateVue}T${heureVue || '19:00'}:00`).toISOString()
+
     const payload = {
       restaurant_id: restoId,
       table_id: table.id,
@@ -773,17 +858,13 @@ export default function PlanDeSalle() {
       nb_persons: form.nb_persons,
       notes: form.notes,
       status: 'occupee',
-      started_at: new Date().toISOString(),
-      service_at: null,
-      duration_minutes: table.duration_minutes || TABLE_DEFAULT_DURATION,
+      started_at: serviceAt,
+      service_at: serviceAt,
+      duration_minutes: form.duration_minutes || table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
-    if (existing) {
-      const { error } = await supabase.from('table_assignments').update(payload).eq('id', existing.id)
-      if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...payload } }))
-    } else {
-      const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
-      if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
-    }
+    const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
+    if (error) { showToast('Erreur : ' + error.message, 'error'); return }
+    if (data) setServices((prev) => [...prev, data])
     setAssignModal(null)
     showToast(`${table.name} assignée à ${form.client_name}`)
   }
@@ -831,7 +912,7 @@ export default function PlanDeSalle() {
 
   // IDs des réservations déjà liées à une table
   const resaDejaPlacees = new Set(
-    Object.values(assignments).map((a) => a.reservation_id).filter(Boolean)
+    services.map((a) => a.reservation_id).filter(Boolean)
   )
   // Le plan de salle est une vue du jour : le bandeau ne liste que les
   // réservations d'aujourd'hui. Sans cela, un restaurant qui prend des
@@ -844,13 +925,31 @@ export default function PlanDeSalle() {
   // ── Rendu ────────────────────────────────────────────────────────────────────
 
   const visibleTables = tables.filter((t) => t.zone === zone)
-  // État affiché, recalculé à chaque tick d'horloge
-  // Hors du jour en cours, l'horloge n'a pas de sens : on affiche l'intention
-  // de placement telle qu'elle a été préparée.
   const estAujourdhui = dateVue === today()
+
+  // Services regroupés par table, puis service couvrant l'heure sélectionnée.
+  // Une table peut recevoir deux tournées : c'est le moment choisi qui décide
+  // de ce qu'on affiche.
+  const servicesParTable = {}
+  for (const a of services) {
+    ;(servicesParTable[a.table_id] ||= []).push(a)
+  }
+
+  const momentVu = heureVue
+    ? new Date(`${dateVue}T${heureVue}:00`).getTime()
+    : now
+
+  const assignments = {}          // table_id → service affiché
   const derivedByTable = {}
+  const nbServicesParTable = {}
   for (const t of tables) {
-    derivedByTable[t.id] = deriveStatus(assignments[t.id], now, !estAujourdhui)
+    const liste = servicesParTable[t.id] || []
+    const courant = serviceAuMoment(liste, momentVu)
+    assignments[t.id] = courant
+    nbServicesParTable[t.id] = nombreServices(liste)
+    // Hors du jour en cours, l'horloge n'a pas de sens : on affiche
+    // l'intention de placement telle qu'elle a été préparée.
+    derivedByTable[t.id] = deriveStatus(courant, now, !estAujourdhui)
   }
 
   const counts = {
@@ -1015,6 +1114,34 @@ export default function PlanDeSalle() {
           )}
         </div>
 
+        {/* Sélecteur d'heure : le plan montre la salle à cet instant */}
+        {!configMode && creneauxJour.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs text-gray-400">Salle à</span>
+              <span className="text-sm font-semibold text-[#1a1a2e]">{heureVue || '—'}</span>
+            </div>
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+              {creneauxJour.map((c) => {
+                const actif = c === heureVue
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setHeureVue(c)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      actif
+                        ? 'bg-[#1a1a2e] text-white'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Zone toggle */}
         <div className="flex gap-1 mb-4 bg-white border border-gray-100 rounded-2xl p-1 w-fit">
           {[['salle', 'Salle'], ['terrasse', 'Terrasse']].map(([z, label]) => (
@@ -1076,6 +1203,7 @@ export default function PlanDeSalle() {
                 table={table}
                 assignment={assignments[table.id]}
                 derived={derivedByTable[table.id]}
+                nbServices={nbServicesParTable[table.id] || 0}
                 selected={editModal?.id === table.id}
                 configMode={configMode}
                 onTap={() => handleTableTap(table)}

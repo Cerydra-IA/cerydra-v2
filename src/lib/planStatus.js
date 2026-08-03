@@ -21,6 +21,37 @@ export const OCCUPEE_GRACE_MIN = 15    // libération auto : durée + 15 min
  *   - upcoming : réservation encore lointaine → la table est utilisable
  *   - late     : l'heure est passée, le client ne s'est pas installé
  */
+/**
+ * Service d'une table couvrant un instant donné.
+ *
+ * Une table peut recevoir plusieurs services dans la journée (19 h puis 21 h).
+ * On retient celui dont la fenêtre [début, début + durée] contient le moment
+ * demandé. Un blocage (sans horaire) vaut pour la journée entière et prime.
+ *
+ * @param {Array} services  lignes d'assignation de CETTE table pour le jour
+ * @param {number} moment   instant considéré (millisecondes)
+ */
+export function serviceAuMoment(services, moment) {
+  if (!services || services.length === 0) return null
+
+  const blocage = services.find((a) => a.status === 'bloquee' && !a.service_at)
+  if (blocage) return blocage
+
+  return (
+    services.find((a) => {
+      if (!a.service_at) return false
+      const debut = new Date(a.service_at).getTime()
+      const duree = (a.duration_minutes || TABLE_DEFAULT_DURATION) * 60000
+      return moment >= debut && moment < debut + duree
+    }) || null
+  )
+}
+
+/** Nombre de services prévus sur une table dans la journée (hors blocage). */
+export function nombreServices(services) {
+  return (services || []).filter((a) => a.service_at && a.status !== 'bloquee').length
+}
+
 export function deriveStatus(a, now = Date.now(), planning = false) {
   if (!a || a.status === 'libre') return { status: 'libre' }
   if (a.status === 'bloquee') return { status: 'bloquee' }  // jamais automatique
