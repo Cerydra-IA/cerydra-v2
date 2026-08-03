@@ -138,8 +138,8 @@ function BandeauAplacer({ reservations, aVenir = 0, jourLabel = "aujourd'hui", o
           >
             <span className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</span>
             <span className="text-gray-400">·</span>
+            {/* Le bandeau ne liste que la journée affichée : l'heure suffit */}
             <span className="text-amber-700 font-semibold">
-              {r.date !== dateVue && new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' '}
               {formatHeure(r.heure)}
             </span>
             <span className="text-gray-400">·</span>
@@ -526,7 +526,9 @@ export default function PlanDeSalle() {
       supabase.from('reservations')
         .select('*')
         .eq('restaurant_id', resto.id)
-        .gte('date', today())
+        // on remonte jusqu'au jour consulté s'il est antérieur à aujourd'hui,
+        // sinon le plan d'une journée passée apparaîtrait vide
+        .gte('date', dateVue < today() ? dateVue : today())
         .in('statut', ['confirmée', 'en_attente'])
         .order('date')
         .order('heure'),
