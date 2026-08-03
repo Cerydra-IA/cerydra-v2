@@ -21,6 +21,12 @@ function formatHeure(h) { return h?.slice(0, 5) || '' }
 
 function today() { return new Date().toISOString().split('T')[0] }
 
+function decalerJour(dateStr, jours) {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + jours)
+  return d.toISOString().split('T')[0]
+}
+
 function heureCourte(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -101,14 +107,14 @@ function TableShape({ table, assignment, derived, selected, onTap, onDragStart, 
 
 // ─── Bandeau réservations à placer ───────────────────────────────────────────
 
-function BandeauAplacer({ reservations, aVenir = 0, onPlace }) {
+function BandeauAplacer({ reservations, aVenir = 0, jourLabel = "aujourd'hui", onPlace }) {
   if (!reservations.length) {
     // Rien à placer aujourd'hui, mais des réservations arrivent : on le signale
     // discrètement plutôt que de masquer complètement l'information.
     if (!aVenir) return null
     return (
       <p className="text-xs text-gray-400 mb-4">
-        Aucune réservation à placer aujourd'hui · {aVenir} à venir les prochains jours
+        Aucune réservation à placer {jourLabel} · {aVenir} sur les autres jours
       </p>
     )
   }
@@ -117,10 +123,10 @@ function BandeauAplacer({ reservations, aVenir = 0, onPlace }) {
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
         <p className="text-sm font-semibold text-amber-800">
-          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer aujourd'hui
+          {reservations.length} réservation{reservations.length > 1 ? 's' : ''} à placer {jourLabel}
         </p>
         {aVenir > 0 && (
-          <span className="text-xs text-amber-600/70">· {aVenir} à venir les prochains jours</span>
+          <span className="text-xs text-amber-600/70">· {aVenir} sur les autres jours</span>
         )}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -133,7 +139,7 @@ function BandeauAplacer({ reservations, aVenir = 0, onPlace }) {
             <span className="font-medium text-[#1a1a2e]">{r.prenom} {r.nom}</span>
             <span className="text-gray-400">·</span>
             <span className="text-amber-700 font-semibold">
-              {r.date !== today() && new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' '}
+              {r.date !== dateVue && new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' '}
               {formatHeure(r.heure)}
             </span>
             <span className="text-gray-400">·</span>
@@ -473,6 +479,7 @@ export default function PlanDeSalle() {
   const [tables, setTables] = useState([])
   const [assignments, setAssignments] = useState({})     // table_id → assignment
   const [now, setNow] = useState(() => Date.now())       // horloge du plan (tick 30 s)
+  const [dateVue, setDateVue] = useState(() => today())  // journée affichée
   const [reservations, setReservations] = useState([])   // réservations du jour
   const [zone, setZone] = useState('salle')
   const [configMode, setConfigMode] = useState(false)
@@ -502,7 +509,7 @@ export default function PlanDeSalle() {
   useEffect(() => {
     if (!user) return
     loadAll()
-  }, [user])
+  }, [user, dateVue])
 
   const loadAll = async () => {
     setLoading(true)
@@ -513,7 +520,9 @@ export default function PlanDeSalle() {
 
     const [{ data: tablesData }, { data: assignData }, { data: resaData }] = await Promise.all([
       supabase.from('plan_tables').select('*').eq('restaurant_id', resto.id).order('name'),
-      supabase.from('table_assignments').select('*').eq('restaurant_id', resto.id),
+      supabase.from('table_assignments').select('*')
+        .eq('restaurant_id', resto.id)
+        .eq('service_date', dateVue),
       supabase.from('reservations')
         .select('*')
         .eq('restaurant_id', resto.id)
@@ -544,7 +553,7 @@ export default function PlanDeSalle() {
       }, (payload) => {
         if (payload.eventType === 'DELETE') {
           setAssignments((prev) => { const n = { ...prev }; delete n[payload.old.table_id]; return n })
-        } else {
+        } else if (payload.new.service_date === dateVue) {
           setAssignments((prev) => ({ ...prev, [payload.new.table_id]: payload.new }))
         }
       })
@@ -554,14 +563,14 @@ export default function PlanDeSalle() {
       }, (payload) => {
         // Nouvelle réservation reçue en temps réel
         const r = payload.new
-        if (r.date === today() && ['confirmée', 'en_attente'].includes(r.statut)) {
+        if (r.date === dateVue && ['confirmée', 'en_attente'].includes(r.statut)) {
           setReservations((prev) => [...prev, r].sort((a, b) => a.heure.localeCompare(b.heure)))
         }
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [restoId])
+  }, [restoId, dateVue])
 
   // ── Horloge : recalcule les statuts affichés toutes les 30 s ────────────────
 
@@ -578,6 +587,9 @@ export default function PlanDeSalle() {
   const sweeping = useRef(new Set())
 
   useEffect(() => {
+    // Uniquement sur la journée en cours : sur un autre jour, on consulte une
+    // préparation, il n'y a rien à libérer.
+    if (dateVue !== today()) return
     const perimees = Object.values(assignments).filter(
       (a) => deriveStatus(a, now).expired && !sweeping.current.has(a.id)
     )
@@ -603,7 +615,7 @@ export default function PlanDeSalle() {
         }
         perimees.forEach((a) => sweeping.current.delete(a.id))
       })
-  }, [assignments, now])
+  }, [assignments, now, dateVue])
 
   // ── Drag & drop ─────────────────────────────────────────────────────────────
 
@@ -649,6 +661,7 @@ export default function PlanDeSalle() {
     const payload = {
       restaurant_id: restoId,
       table_id: table.id,
+      service_date: dateVue,
       reservation_id: resa.id,
       client_name: `${resa.prenom} ${resa.nom}`,
       nb_persons: resa.nb_personnes,
@@ -734,7 +747,7 @@ export default function PlanDeSalle() {
         if (!error) setAssignments((prev) => ({ ...prev, [table.id]: { ...existing, ...update } }))
       } else {
         const { data, error } = await supabase.from('table_assignments').insert({
-          restaurant_id: restoId, table_id: table.id, ...update,
+          restaurant_id: restoId, table_id: table.id, service_date: dateVue, ...update,
         }).select().single()
         if (!error && data) setAssignments((prev) => ({ ...prev, [table.id]: data }))
       }
@@ -753,6 +766,7 @@ export default function PlanDeSalle() {
     const payload = {
       restaurant_id: restoId,
       table_id: table.id,
+      service_date: dateVue,
       client_name: form.client_name,
       nb_persons: form.nb_persons,
       notes: form.notes,
@@ -822,15 +836,20 @@ export default function PlanDeSalle() {
   // réservations deux semaines à l'avance se retrouve avec des centaines de
   // lignes illisibles au-dessus de son plan.
   const nonPlacees = reservations.filter((r) => !resaDejaPlacees.has(r.id))
-  const resasNonPlacees = nonPlacees.filter((r) => r.date === today())
+  const resasNonPlacees = nonPlacees.filter((r) => r.date === dateVue)
   const resasAVenir = nonPlacees.length - resasNonPlacees.length
 
   // ── Rendu ────────────────────────────────────────────────────────────────────
 
   const visibleTables = tables.filter((t) => t.zone === zone)
   // État affiché, recalculé à chaque tick d'horloge
+  // Hors du jour en cours, l'horloge n'a pas de sens : on affiche l'intention
+  // de placement telle qu'elle a été préparée.
+  const estAujourdhui = dateVue === today()
   const derivedByTable = {}
-  for (const t of tables) derivedByTable[t.id] = deriveStatus(assignments[t.id], now)
+  for (const t of tables) {
+    derivedByTable[t.id] = deriveStatus(assignments[t.id], now, !estAujourdhui)
+  }
 
   const counts = {
     libre:    visibleTables.filter((t) => derivedByTable[t.id].status === 'libre').length,
@@ -871,9 +890,34 @@ export default function PlanDeSalle() {
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           <div>
             <h1 className="text-xl font-bold text-[#1a1a2e]">Plan de salle</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
+            {/* Navigation par jour : permet de préparer un service à l'avance */}
+            <div className="flex items-center gap-1.5 mt-1">
+              <button
+                onClick={() => setDateVue(decalerJour(dateVue, -1))}
+                disabled={configMode}
+                aria-label="Jour précédent"
+                className="w-6 h-6 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-colors disabled:opacity-30"
+              >‹</button>
+              <p className={`text-xs ${estAujourdhui ? 'text-gray-400' : 'text-[#1a6bff] font-medium'}`}>
+                {new Date(dateVue + 'T00:00:00').toLocaleDateString('fr-FR', {
+                  weekday: 'long', day: 'numeric', month: 'long',
+                })}
+              </p>
+              <button
+                onClick={() => setDateVue(decalerJour(dateVue, 1))}
+                disabled={configMode}
+                aria-label="Jour suivant"
+                className="w-6 h-6 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-colors disabled:opacity-30"
+              >›</button>
+              {!estAujourdhui && (
+                <button
+                  onClick={() => setDateVue(today())}
+                  className="ml-1 text-xs text-gray-400 hover:text-[#1a1a2e] underline underline-offset-2"
+                >
+                  aujourd'hui
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="hidden md:flex items-center gap-2">
@@ -919,6 +963,9 @@ export default function PlanDeSalle() {
           <BandeauAplacer
             reservations={resasNonPlacees}
             aVenir={resasAVenir}
+            jourLabel={estAujourdhui
+              ? "aujourd'hui"
+              : 'le ' + new Date(dateVue + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
             onPlace={(r) => {
               setResaEnCours((prev) => prev?.id === r.id ? null : r)
             }}

@@ -21,9 +21,15 @@ export const OCCUPEE_GRACE_MIN = 15    // libération auto : durée + 15 min
  *   - upcoming : réservation encore lointaine → la table est utilisable
  *   - late     : l'heure est passée, le client ne s'est pas installé
  */
-export function deriveStatus(a, now = Date.now()) {
+export function deriveStatus(a, now = Date.now(), planning = false) {
   if (!a || a.status === 'libre') return { status: 'libre' }
   if (a.status === 'bloquee') return { status: 'bloquee' }  // jamais automatique
+
+  // Mode planification (on consulte un autre jour que celui en cours) :
+  // l'horloge n'a pas de sens, on montre l'intention de placement telle quelle.
+  if (planning) {
+    return { status: a.status, at: a.service_at || a.started_at || null, planning: true }
+  }
 
   const dureeMs = (a.duration_minutes || TABLE_DEFAULT_DURATION) * 60000
 

@@ -227,6 +227,7 @@ MIGRATIONS_APRES_DUMP = [
     '20260708_creneau_disponibilite.sql',
     '20260730_creneaux_du_jour.sql',
     '20260731_capacite_par_places.sql',
+    '20260731_plan_par_date.sql',
 ]
 
 suite = []

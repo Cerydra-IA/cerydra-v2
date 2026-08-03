@@ -36,9 +36,22 @@ const cas = [
   ['résa sans horodatage (legacy)', { status: 'reservee' },                                            'reservee'],
 ]
 
+// Mode planification : on consulte un autre jour, l'horloge ne s'applique pas
+const casPlanning = [
+  ['planif : résa dans 5 jours',    { status: 'reservee', service_at: iso(7200), duration_minutes: 90 }, 'reservee'],
+  ['planif : résa passée',          { status: 'reservee', service_at: iso(-7200), duration_minutes: 90 }, 'reservee'],
+  ['planif : table occupée',        { status: 'occupee', started_at: iso(-7200), duration_minutes: 90 }, 'occupee'],
+  ['planif : table bloquée',        { status: 'bloquee' },                                               'bloquee'],
+  ['planif : table libre',          { status: 'libre' },                                                 'libre'],
+]
+
 let echecs = 0
-for (const [nom, a, attendu] of cas) {
-  const d = deriveStatus(a, N)
+const tous = [
+  ...cas.map((c) => [...c, false]),
+  ...casPlanning.map((c) => [...c, true]),
+]
+for (const [nom, a, attendu, planning] of tous) {
+  const d = deriveStatus(a, N, planning)
   const obtenu =
     d.status +
     (d.expired ? '+expired' : '') +
@@ -53,7 +66,7 @@ for (const [nom, a, attendu] of cas) {
 
 console.log(
   echecs === 0
-    ? `\n✅ planStatus : ${cas.length}/${cas.length} tests passés`
-    : `\n❌ planStatus : ${echecs} échec(s) sur ${cas.length}`
+    ? `\n✅ planStatus : ${tous.length}/${tous.length} tests passés`
+    : `\n❌ planStatus : ${echecs} échec(s) sur ${tous.length}`
 )
 process.exit(echecs === 0 ? 0 : 1)
