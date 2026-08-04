@@ -9,6 +9,7 @@ const STATUTS = {
   en_attente: { label: 'En attente', bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400' },
   confirmée:  { label: 'Confirmée',  bg: 'bg-green-50',  text: 'text-green-600',  dot: 'bg-green-400' },
   annulée:    { label: 'Annulée',    bg: 'bg-red-50',    text: 'text-red-500',    dot: 'bg-red-400' },
+  no_show:    { label: 'No-show',    bg: 'bg-gray-100',  text: 'text-gray-500',   dot: 'bg-gray-400' },
 }
 
 function Badge({ statut }) {
@@ -435,13 +436,23 @@ export default function Reservations() {
                       </>
                     )}
                     {r.statut === 'confirmée' && (
-                      <button
-                        onClick={() => updateStatut(r.id, 'annulée')}
-                        disabled={updatingId === r.id}
-                        className="flex-1 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40"
-                      >
-                        Annuler
-                      </button>
+                      <>
+                        <button
+                          onClick={() => updateStatut(r.id, 'annulée')}
+                          disabled={updatingId === r.id}
+                          className="flex-1 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={() => updateStatut(r.id, 'no_show')}
+                          disabled={updatingId === r.id}
+                          title="Le client n'est jamais venu, sans prévenir"
+                          className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-500 text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-40"
+                        >
+                          No-show
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => deleteReservation(r.id)}
@@ -517,13 +528,24 @@ export default function Reservations() {
                       </div>
                     )}
                     {r.statut === 'confirmée' && (
-                      <button
-                        onClick={() => updateStatut(r.id, 'annulée')}
-                        disabled={updatingId === r.id}
-                        className="text-xs text-red-400 hover:underline disabled:opacity-40 mt-0.5"
-                      >
-                        Annuler
-                      </button>
+                      <div className="flex gap-1 mt-0.5">
+                        <button
+                          onClick={() => updateStatut(r.id, 'annulée')}
+                          disabled={updatingId === r.id}
+                          className="text-xs text-red-400 hover:underline disabled:opacity-40"
+                        >
+                          Annuler
+                        </button>
+                        <span className="text-gray-300">·</span>
+                        <button
+                          onClick={() => updateStatut(r.id, 'no_show')}
+                          disabled={updatingId === r.id}
+                          title="Le client n'est jamais venu, sans prévenir"
+                          className="text-xs text-gray-400 hover:underline disabled:opacity-40"
+                        >
+                          No-show
+                        </button>
+                      </div>
                     )}
                     <button
                       onClick={() => deleteReservation(r.id)}

@@ -46,7 +46,7 @@ function CustomTooltip({ active, payload, label }) {
 export default function Statistiques() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ totalMois: 0, couvertsMois: 0, tauxAnnulation: 0 })
+  const [stats, setStats] = useState({ totalMois: 0, couvertsMois: 0, tauxAnnulation: 0, tauxNoShow: 0 })
   const [dailyData, setDailyData] = useState([])
   const [monthlyData, setMonthlyData] = useState([])
 
@@ -79,8 +79,19 @@ export default function Statistiques() {
 
     const total      = (resMois ?? []).length
     const annulees   = (resMois ?? []).filter(r => r.statut === 'annulée').length
-    const couverts   = (resMois ?? []).filter(r => r.statut !== 'annulée').reduce((s, r) => s + (r.nb_personnes || 0), 0)
-    setStats({ totalMois: total - annulees, couvertsMois: couverts, tauxAnnulation: total > 0 ? Math.round(annulees / total * 100) : 0 })
+    const noShows    = (resMois ?? []).filter(r => r.statut === 'no_show').length
+    // Couverts réels : ni annulé (jamais confirmé), ni no-show (personne à table)
+    const couverts   = (resMois ?? []).filter(r => r.statut !== 'annulée' && r.statut !== 'no_show')
+      .reduce((s, r) => s + (r.nb_personnes || 0), 0)
+    // Le taux de no-show se calcule sur les réservations honorées ou non
+    // (annulées à l'avance exclues : prévenir n'est pas un no-show)
+    const honorables = total - annulees
+    setStats({
+      totalMois: total - annulees,
+      couvertsMois: couverts,
+      tauxAnnulation: total > 0 ? Math.round(annulees / total * 100) : 0,
+      tauxNoShow: honorables > 0 ? Math.round(noShows / honorables * 100) : 0,
+    })
 
     // Daily 30j
     const byDay = {}
@@ -112,10 +123,11 @@ export default function Statistiques() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <StatCard label="Réservations ce mois" value={stats.totalMois} sub="hors annulées" />
-              <StatCard label="Couverts ce mois" value={stats.couvertsMois} sub="hors annulées" />
+              <StatCard label="Couverts ce mois" value={stats.couvertsMois} sub="hors annulées et no-shows" />
               <StatCard label="Taux d'annulation" value={stats.tauxAnnulation + '%'} sub="sur ce mois" />
+              <StatCard label="Taux de no-show" value={stats.tauxNoShow + '%'} sub="parmi les résas honorables" />
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 p-6">

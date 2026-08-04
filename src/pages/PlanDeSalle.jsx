@@ -236,6 +236,22 @@ function ServiceModal({ table, assignment, derived, pendingResa, onClose, onActi
             </div>
           )}
 
+          {/* Réservation en retard (30 min passées sans installation) : le
+              client ne viendra probablement plus, on propose de le noter. */}
+          {d.late && (
+            <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <p className="text-xs text-red-700">
+                Personne installé depuis {heureCourte(d.at)} — le client ne viendra peut-être plus.
+              </p>
+              <button
+                onClick={() => onAction('no_show')}
+                className="mt-2 w-full py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-colors"
+              >
+                Marquer no-show et libérer la table
+              </button>
+            </div>
+          )}
+
           {/* Réservation en attente de placement sur cette table */}
           {pendingResa && (
             <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -706,15 +722,22 @@ export default function PlanDeSalle() {
 
     perimees.forEach((a) => sweeping.current.add(a.id))
     const ids = perimees.map((a) => a.id)
+    // Réservation jamais honorée et jamais traitée à la main : on la marque
+    // no-show avant de libérer la table, sinon le nettoyage automatique la
+    // fait disparaître sans laisser de trace dans les stats.
+    const resaIds = perimees
+      .filter((a) => a.status === 'reservee' && a.reservation_id)
+      .map((a) => a.reservation_id)
 
-    supabase
-      .from('table_assignments')
-      .delete()
-      .in('id', ids)
-      .then(({ error }) => {
-        if (!error) setServices((prev) => prev.filter((a) => !ids.includes(a.id)))
-        ids.forEach((id) => sweeping.current.delete(id))
-      })
+    Promise.all([
+      supabase.from('table_assignments').delete().in('id', ids),
+      resaIds.length
+        ? supabase.from('reservations').update({ statut: 'no_show' }).in('id', resaIds)
+        : Promise.resolve({ error: null }),
+    ]).then(([delRes]) => {
+      if (!delRes.error) setServices((prev) => prev.filter((a) => !ids.includes(a.id)))
+      ids.forEach((id) => sweeping.current.delete(id))
+    })
   }, [services, now, dateVue])
 
   // ── Drag & drop ─────────────────────────────────────────────────────────────
@@ -825,6 +848,23 @@ export default function PlanDeSalle() {
       }
       setServiceModal(null)
       showToast(`${table.name} → Libre`)
+      return
+    }
+
+    // No-show : le client réservé n'est jamais venu. On libère la table et,
+    // si un lien vers une réservation existe, on la marque pour les stats
+    // (distinct d'une annulation : le client n'a pas prévenu).
+    if (action === 'no_show') {
+      const courant = assignments[table.id]
+      if (courant) {
+        const { error } = await supabase.from('table_assignments').delete().eq('id', courant.id)
+        if (!error) setServices((prev) => prev.filter((a) => a.id !== courant.id))
+        if (courant.reservation_id) {
+          await supabase.from('reservations').update({ statut: 'no_show' }).eq('id', courant.reservation_id)
+        }
+      }
+      setServiceModal(null)
+      showToast(`${table.name} → No-show`, 'error')
       return
     }
 
