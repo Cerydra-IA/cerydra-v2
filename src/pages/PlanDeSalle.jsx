@@ -234,10 +234,13 @@ function ServiceModal({ table, assignment, derived, pendingResa, onClose, onActi
           <p className="text-xs font-medium text-gray-400 mb-2 px-1">Changer le statut</p>
           {Object.entries(STATUS).map(([st, info]) => {
             const isCurrent = d.status === st
+            // Occupée / Réservée sans lier une résa en ligne : on demande un nom,
+            // sinon la table reste muette (seule l'heure s'affiche dessus).
+            const besoinNom = (st === 'occupee' || st === 'reservee') && !isCurrent
             return (
               <button
                 key={st}
-                onClick={() => onAction('status', st)}
+                onClick={() => onAction(besoinNom ? 'status_form' : 'status', st)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isCurrent ? 'bg-gray-100' : 'hover:bg-gray-50'
                 }`}
@@ -339,8 +342,13 @@ function ChooseResaModal({ table, reservationsNonPlacees, onClose, onLink }) {
 
 // ─── Modal walk-in ────────────────────────────────────────────────────────────
 
-function AssignModal({ table, onClose, onSave }) {
+function AssignModal({ table, statusVoulu = 'occupee', onClose, onSave }) {
   const [form, setForm] = useState({ client_name: '', nb_persons: table?.capacity || 2, notes: '' })
+  const [saving, setSaving] = useState(false)
+  // setSaving(true) est asynchrone : un double-clic avant le re-render passait
+  // encore le `disabled`. La ref bloque dès le premier clic, sans attendre React.
+  const savingRef = useRef(false)
+  const estReservee = statusVoulu === 'reservee'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -350,8 +358,12 @@ function AssignModal({ table, onClose, onSave }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-          <p className="font-semibold text-[#1a1a2e]">Client walk-in — {table?.name}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Client sans réservation en ligne</p>
+          <p className="font-semibold text-[#1a1a2e]">
+            {estReservee ? 'Réservation' : 'Client walk-in'} — {table?.name}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {estReservee ? 'Réservation prise par téléphone ou sur place' : 'Client sans réservation en ligne'}
+          </p>
         </div>
         <div className="p-5 space-y-4">
           <div>
@@ -383,10 +395,16 @@ function AssignModal({ table, onClose, onSave }) {
             />
           </div>
           <button
-            onClick={() => onSave({ ...form, client_name: form.client_name.trim() || 'Sans nom' })}
+            disabled={saving}
+            onClick={() => {
+              if (savingRef.current) return
+              savingRef.current = true
+              setSaving(true)
+              onSave({ ...form, client_name: form.client_name.trim() || 'Sans nom' })
+            }}
             className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50"
           >
-            Assigner et marquer Occupée
+            {saving ? 'Enregistrement…' : estReservee ? 'Marquer Réservée' : 'Assigner et marquer Occupée'}
           </button>
         </div>
         <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
@@ -763,6 +781,15 @@ export default function PlanDeSalle() {
       return
     }
 
+    // Occupée / Réservée choisie sans lier de résa en ligne : on demande un
+    // nom via le même formulaire que le walk-in, pour que la table ne reste
+    // pas muette.
+    if (action === 'status_form') {
+      setServiceModal(null)
+      setAssignModal({ ...table, _statusVoulu: value })
+      return
+    }
+
     if (action === 'choose_resa') {
       setServiceModal(null)
       setChooseResaModal(table)
@@ -844,9 +871,12 @@ export default function PlanDeSalle() {
   const handleAssignSave = async (form) => {
     const table = assignModal
     if (!table) return
-    // Un client sans réservation occupe la table à partir de maintenant
-    // (ou de l'heure consultée si l'on prépare un autre service).
-    const serviceAt = estAujourdhui
+    const statusVoulu = table._statusVoulu || 'occupee'
+
+    // Walk-in : occupe la table à partir de maintenant (ou de l'heure
+    // consultée si l'on prépare un autre jour). Réservation : l'heure du
+    // service est celle du sélecteur, pas l'instant présent.
+    const serviceAt = statusVoulu === 'occupee' && estAujourdhui
       ? new Date().toISOString()
       : new Date(`${dateVue}T${heureVue || '19:00'}:00`).toISOString()
 
@@ -857,16 +887,31 @@ export default function PlanDeSalle() {
       client_name: form.client_name,
       nb_persons: form.nb_persons,
       notes: form.notes,
-      status: 'occupee',
-      started_at: serviceAt,
+      status: statusVoulu,
+      started_at: statusVoulu === 'occupee' ? serviceAt : null,
       service_at: serviceAt,
       duration_minutes: form.duration_minutes || table.duration_minutes || TABLE_DEFAULT_DURATION,
     }
-    const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
-    if (error) { showToast('Erreur : ' + error.message, 'error'); return }
-    if (data) setServices((prev) => [...prev, data])
+
+    // Un service existe déjà pile à cet instant (ex : on requalifie une table
+    // déjà « Occupée » en « Réservée ») : on le remplace plutôt que de
+    // violer l'unicité (table_id, service_at).
+    const existant = (servicesParTable[table.id] || []).find(
+      (a) => a.service_at && new Date(a.service_at).getTime() === new Date(serviceAt).getTime()
+    )
+
+    if (existant) {
+      const { error } = await supabase.from('table_assignments').update(payload).eq('id', existant.id)
+      if (error) { showToast('Erreur : ' + error.message, 'error'); return }
+      setServices((prev) => prev.map((a) => a.id === existant.id ? { ...a, ...payload } : a))
+    } else {
+      const { data, error } = await supabase.from('table_assignments').insert(payload).select().single()
+      if (error) { showToast('Erreur : ' + error.message, 'error'); return }
+      if (data) setServices((prev) => [...prev, data])
+    }
+
     setAssignModal(null)
-    showToast(`${table.name} assignée à ${form.client_name}`)
+    showToast(`${table.name} — ${form.client_name} · ${STATUS[statusVoulu].label}`)
   }
 
   // ── Edit table config ────────────────────────────────────────────────────────
@@ -947,9 +992,11 @@ export default function PlanDeSalle() {
     const courant = serviceAuMoment(liste, momentVu)
     assignments[t.id] = courant
     nbServicesParTable[t.id] = nombreServices(liste)
-    // Hors du jour en cours, l'horloge n'a pas de sens : on affiche
-    // l'intention de placement telle qu'elle a été préparée.
-    derivedByTable[t.id] = deriveStatus(courant, now, !estAujourdhui)
+    // La couleur reflète l'instant CONSULTÉ (momentVu), pas l'horloge réelle :
+    // sinon une résa de 21 h reste verte tant qu'il n'est pas 21 h pour de vrai,
+    // alors qu'on veut prévisualiser « à quoi ressemble la salle à ce moment ».
+    // Hors du jour en cours, l'horloge n'a de toute façon pas de sens.
+    derivedByTable[t.id] = deriveStatus(courant, momentVu, !estAujourdhui)
   }
 
   const counts = {
@@ -1261,6 +1308,7 @@ export default function PlanDeSalle() {
       {assignModal && (
         <AssignModal
           table={assignModal}
+          statusVoulu={assignModal._statusVoulu || 'occupee'}
           onClose={() => setAssignModal(null)}
           onSave={handleAssignSave}
         />

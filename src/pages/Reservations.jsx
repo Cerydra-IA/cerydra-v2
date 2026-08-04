@@ -265,14 +265,24 @@ export default function Reservations() {
 
   const aujourd_hui = new Date().toISOString().split('T')[0]
 
-  const filtered = reservations.filter((r) => {
-    if (filtre === 'a_venir') return r.date >= aujourd_hui
-    if (filtre === 'passees') return r.date < aujourd_hui
-    return true
-  })
+  const filtered = reservations
+    .filter((r) => {
+      if (filtre === 'aujourd_hui') return r.date === aujourd_hui
+      if (filtre === 'a_venir') return r.date >= aujourd_hui
+      if (filtre === 'passees') return r.date < aujourd_hui
+      return true
+    })
+    // Vue "aujourd'hui"/"à venir" : la prochaine arrivée en premier, comme une
+    // fiche de service. Vue "passées" : la plus récente en premier (par défaut
+    // du tri serveur), pour retrouver rapidement ce qui vient de se passer.
+    .sort((a, b) => {
+      if (filtre === 'passees') return 0
+      return a.date.localeCompare(b.date) || (a.heure || '').localeCompare(b.heure || '')
+    })
 
   const counts = {
     toutes: reservations.length,
+    aujourd_hui: reservations.filter((r) => r.date === aujourd_hui).length,
     a_venir: reservations.filter((r) => r.date >= aujourd_hui).length,
     passees: reservations.filter((r) => r.date < aujourd_hui).length,
   }
@@ -332,6 +342,7 @@ export default function Reservations() {
         <div className="flex gap-2 mb-6">
           {[
             { key: 'toutes', label: 'Toutes' },
+            { key: 'aujourd_hui', label: "Aujourd'hui" },
             { key: 'a_venir', label: 'À venir' },
             { key: 'passees', label: 'Passées' },
           ].map(({ key, label }) => (
