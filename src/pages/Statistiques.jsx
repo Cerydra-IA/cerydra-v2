@@ -33,12 +33,13 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label, unite = 'réservation' }) {
   if (!active || !payload?.length) return null
+  const v = payload[0].value
   return (
     <div className="bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-sm text-xs">
       <p className="text-gray-500 mb-1">{label}</p>
-      <p className="font-semibold text-[#1a1a2e]">{payload[0].value} réservation{payload[0].value !== 1 ? 's' : ''}</p>
+      <p className="font-semibold text-[#1a1a2e]">{v} {unite}{v !== 1 ? 's' : ''}</p>
     </div>
   )
 }
@@ -46,9 +47,10 @@ function CustomTooltip({ active, payload, label }) {
 export default function Statistiques() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ totalMois: 0, couvertsMois: 0, tauxAnnulation: 0, tauxNoShow: 0 })
+  const [stats, setStats] = useState({ totalMois: 0, couvertsMois: 0, tauxAnnulation: 0, noShowsMois: 0, tauxNoShow: 0 })
   const [dailyData, setDailyData] = useState([])
   const [monthlyData, setMonthlyData] = useState([])
+  const [monthlyNoShow, setMonthlyNoShow] = useState([])
 
   useEffect(() => {
     if (!user) return
@@ -74,7 +76,7 @@ export default function Statistiques() {
     const [{ data: resMois }, { data: res30j }, { data: res6m }] = await Promise.all([
       supabase.from('reservations').select('statut, nb_personnes').eq('restaurant_id', resto.id).gte('date', monthStart),
       supabase.from('reservations').select('date').eq('restaurant_id', resto.id).neq('statut', 'annulée').gte('date', day30ago),
-      supabase.from('reservations').select('date').eq('restaurant_id', resto.id).neq('statut', 'annulée').gte('date', month6ago),
+      supabase.from('reservations').select('date, statut').eq('restaurant_id', resto.id).neq('statut', 'annulée').gte('date', month6ago),
     ])
 
     const total      = (resMois ?? []).length
@@ -90,6 +92,7 @@ export default function Statistiques() {
       totalMois: total - annulees,
       couvertsMois: couverts,
       tauxAnnulation: total > 0 ? Math.round(annulees / total * 100) : 0,
+      noShowsMois: noShows,
       tauxNoShow: honorables > 0 ? Math.round(noShows / honorables * 100) : 0,
     })
 
@@ -107,6 +110,17 @@ export default function Statistiques() {
     }
     for (const r of res6m ?? []) { const k = r.date.slice(0,7); if (byMonth[k] !== undefined) byMonth[k]++ }
     setMonthlyData(Object.entries(byMonth).map(([key, count]) => ({ mois: fmtMonth(key), reservations: count })))
+
+    // No-shows par mois — 6m : compte séparé, la courbe reste visible même
+    // quand un seul no-show est noyé dans le volume total des réservations.
+    const byMonthNoShow = {}
+    for (const key of Object.keys(byMonth)) byMonthNoShow[key] = 0
+    for (const r of res6m ?? []) {
+      if (r.statut !== 'no_show') continue
+      const k = r.date.slice(0, 7)
+      if (byMonthNoShow[k] !== undefined) byMonthNoShow[k]++
+    }
+    setMonthlyNoShow(Object.entries(byMonthNoShow).map(([key, count]) => ({ mois: fmtMonth(key), noShows: count })))
 
     setLoading(false)
   }
@@ -127,7 +141,11 @@ export default function Statistiques() {
               <StatCard label="Réservations ce mois" value={stats.totalMois} sub="hors annulées" />
               <StatCard label="Couverts ce mois" value={stats.couvertsMois} sub="hors annulées et no-shows" />
               <StatCard label="Taux d'annulation" value={stats.tauxAnnulation + '%'} sub="sur ce mois" />
-              <StatCard label="Taux de no-show" value={stats.tauxNoShow + '%'} sub="parmi les résas honorables" />
+              <StatCard
+                label="No-shows ce mois"
+                value={stats.noShowsMois}
+                sub={`${stats.tauxNoShow}% des résas honorables — un taux se lit mal à faible volume`}
+              />
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -152,6 +170,20 @@ export default function Statistiques() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="reservations" fill="#1a1a2e" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="text-sm font-semibold text-[#1a1a2e] mb-1">No-shows par mois — 6 derniers mois</h2>
+              <p className="text-xs text-gray-400 mb-6">Clients réservés jamais venus, sans annuler</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={monthlyNoShow} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="mois" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip unite="no-show" />} />
+                  <Bar dataKey="noShows" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={48} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
