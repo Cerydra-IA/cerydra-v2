@@ -203,13 +203,36 @@ function ServiceModal({ table, assignment, derived, pendingResa, onClose, onActi
             </div>
           </div>
 
-          {/* Info client actuel */}
+          {/* Info client actuel — modifiable et supprimable directement ici,
+              pour ne pas avoir à passer par « Libre » puis tout ressaisir. */}
           {assignment?.client_name && (
-            <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-0.5">
-              <p className="font-medium text-[#1a1a2e]">{assignment.client_name}</p>
-              {assignment.nb_persons && <p className="text-gray-500 text-xs">{assignment.nb_persons} personnes</p>}
-              {assignment.notes && <p className="text-gray-400 text-xs">Réservation à {assignment.notes.split(' · ')[0]}</p>}
-              {assignment.notes && <p className="text-gray-400 text-xs italic">{assignment.notes}</p>}
+            <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 text-sm flex items-start justify-between gap-2">
+              <div className="space-y-0.5 min-w-0">
+                <p className="font-medium text-[#1a1a2e]">{assignment.client_name}</p>
+                {assignment.nb_persons && <p className="text-gray-500 text-xs">{assignment.nb_persons} personnes</p>}
+                {assignment.notes && <p className="text-gray-400 text-xs">Réservation à {assignment.notes.split(' · ')[0]}</p>}
+                {assignment.notes && <p className="text-gray-400 text-xs italic">{assignment.notes}</p>}
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => onAction('edit')}
+                  title="Modifier"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-[#1a6bff] hover:bg-blue-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onAction('delete')}
+                  title="Supprimer"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
 
@@ -229,14 +252,19 @@ function ServiceModal({ table, assignment, derived, pendingResa, onClose, onActi
           )}
         </div>
 
-        {/* Changement de statut */}
+        {/* Changement de statut — « Libre » n'apparaît pas quand un client est
+            là : la corbeille au-dessus fait déjà ce travail, pas la peine de
+            le proposer deux fois. */}
         <div className="p-4 space-y-1.5">
           <p className="text-xs font-medium text-gray-400 mb-2 px-1">Changer le statut</p>
-          {Object.entries(STATUS).map(([st, info]) => {
+          {Object.entries(STATUS)
+            .filter(([st]) => !(st === 'libre' && assignment?.client_name))
+            .map(([st, info]) => {
             const isCurrent = d.status === st
-            // Occupée / Réservée sans lier une résa en ligne : on demande un nom,
-            // sinon la table reste muette (seule l'heure s'affiche dessus).
-            const besoinNom = (st === 'occupee' || st === 'reservee') && !isCurrent
+            // On ne redemande un nom que si aucun client n'est déjà attaché à
+            // ce service : sinon changer occupée → réservée effacerait le nom
+            // déjà saisi pour rien.
+            const besoinNom = (st === 'occupee' || st === 'reservee') && !isCurrent && !assignment?.client_name
             return (
               <button
                 key={st}
@@ -252,26 +280,30 @@ function ServiceModal({ table, assignment, derived, pendingResa, onClose, onActi
             )
           })}
 
-          <div className="border-t border-gray-100 pt-2 mt-2 space-y-1">
-            <button
-              onClick={() => onAction('assign')}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[#1a6bff] hover:bg-blue-50 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Assigner un client walk-in
-            </button>
-            <button
-              onClick={() => onAction('choose_resa')}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Lier à une réservation en ligne
-            </button>
-          </div>
+          {/* Assigner un nouveau client : uniquement utile si la table n'a
+              personne pour l'instant consulté — sinon on modifie plutôt. */}
+          {!assignment?.client_name && (
+            <div className="border-t border-gray-100 pt-2 mt-2 space-y-1">
+              <button
+                onClick={() => onAction('assign')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[#1a6bff] hover:bg-blue-50 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Assigner un client walk-in
+              </button>
+              <button
+                onClick={() => onAction('choose_resa')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Lier à une réservation en ligne
+              </button>
+            </div>
+          )}
         </div>
 
         <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
@@ -342,8 +374,10 @@ function ChooseResaModal({ table, reservationsNonPlacees, onClose, onLink }) {
 
 // ─── Modal walk-in ────────────────────────────────────────────────────────────
 
-function AssignModal({ table, statusVoulu = 'occupee', onClose, onSave }) {
-  const [form, setForm] = useState({ client_name: '', nb_persons: table?.capacity || 2, notes: '' })
+function AssignModal({ table, statusVoulu = 'occupee', editing, onClose, onSave }) {
+  const [form, setForm] = useState(() => editing
+    ? { client_name: editing.client_name || '', nb_persons: editing.nb_persons || table?.capacity || 2, notes: editing.notes || '' }
+    : { client_name: '', nb_persons: table?.capacity || 2, notes: '' })
   const [saving, setSaving] = useState(false)
   // setSaving(true) est asynchrone : un double-clic avant le re-render passait
   // encore le `disabled`. La ref bloque dès le premier clic, sans attendre React.
@@ -359,10 +393,10 @@ function AssignModal({ table, statusVoulu = 'occupee', onClose, onSave }) {
       >
         <div className="px-5 pt-5 pb-4 border-b border-gray-100">
           <p className="font-semibold text-[#1a1a2e]">
-            {estReservee ? 'Réservation' : 'Client walk-in'} — {table?.name}
+            {editing ? 'Modifier' : estReservee ? 'Réservation' : 'Client walk-in'} — {table?.name}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {estReservee ? 'Réservation prise par téléphone ou sur place' : 'Client sans réservation en ligne'}
+            {editing ? 'Nom, couverts et note' : estReservee ? 'Réservation prise par téléphone ou sur place' : 'Client sans réservation en ligne'}
           </p>
         </div>
         <div className="p-5 space-y-4">
@@ -404,7 +438,7 @@ function AssignModal({ table, statusVoulu = 'occupee', onClose, onSave }) {
             }}
             className="w-full py-3 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50"
           >
-            {saving ? 'Enregistrement…' : estReservee ? 'Marquer Réservée' : 'Assigner et marquer Occupée'}
+            {saving ? 'Enregistrement…' : editing ? 'Enregistrer' : estReservee ? 'Marquer Réservée' : 'Assigner et marquer Occupée'}
           </button>
         </div>
         <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
@@ -781,6 +815,29 @@ export default function PlanDeSalle() {
       return
     }
 
+    // Supprimer le service affiché — même geste que « Libre », accessible
+    // directement depuis la fiche client pour ne pas fouiller les statuts.
+    if (action === 'delete') {
+      const courant = assignments[table.id]
+      if (courant) {
+        const { error } = await supabase.from('table_assignments').delete().eq('id', courant.id)
+        if (!error) setServices((prev) => prev.filter((a) => a.id !== courant.id))
+      }
+      setServiceModal(null)
+      showToast(`${table.name} → Libre`)
+      return
+    }
+
+    // Modifier le nom / nombre de personnes / note du service affiché, sans
+    // toucher au statut ni à l'heure.
+    if (action === 'edit') {
+      const courant = assignments[table.id]
+      if (!courant) return
+      setServiceModal(null)
+      setAssignModal({ ...table, _editing: courant })
+      return
+    }
+
     // Occupée / Réservée choisie sans lier de résa en ligne : on demande un
     // nom via le même formulaire que le walk-in, pour que la table ne reste
     // pas muette.
@@ -871,6 +928,19 @@ export default function PlanDeSalle() {
   const handleAssignSave = async (form) => {
     const table = assignModal
     if (!table) return
+
+    // Édition : on ne touche qu'au nom / couverts / note, ni au statut ni à
+    // l'heure du service.
+    if (table._editing) {
+      const patch = { client_name: form.client_name, nb_persons: form.nb_persons, notes: form.notes }
+      const { error } = await supabase.from('table_assignments').update(patch).eq('id', table._editing.id)
+      if (error) { showToast('Erreur : ' + error.message, 'error'); return }
+      setServices((prev) => prev.map((a) => a.id === table._editing.id ? { ...a, ...patch } : a))
+      setAssignModal(null)
+      showToast(`${table.name} — ${form.client_name} mis à jour`)
+      return
+    }
+
     const statusVoulu = table._statusVoulu || 'occupee'
 
     // Walk-in : occupe la table à partir de maintenant (ou de l'heure
@@ -931,7 +1001,7 @@ export default function PlanDeSalle() {
     await supabase.from('plan_tables').delete().eq('id', table.id)
     await supabase.from('table_assignments').delete().eq('table_id', table.id)
     setTables((prev) => prev.filter((t) => t.id !== table.id))
-    setAssignments((prev) => { const n = { ...prev }; delete n[table.id]; return n })
+    setServices((prev) => prev.filter((a) => a.table_id !== table.id))
     setEditModal(null)
     showToast(`${table.name} supprimée`)
   }
@@ -1309,6 +1379,7 @@ export default function PlanDeSalle() {
         <AssignModal
           table={assignModal}
           statusVoulu={assignModal._statusVoulu || 'occupee'}
+          editing={assignModal._editing || null}
           onClose={() => setAssignModal(null)}
           onSave={handleAssignSave}
         />
