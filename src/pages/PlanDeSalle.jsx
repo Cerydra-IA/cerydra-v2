@@ -1102,11 +1102,13 @@ export default function PlanDeSalle() {
     const courant = serviceAuMoment(liste, momentVu)
     assignments[t.id] = courant
     nbServicesParTable[t.id] = nombreServices(liste)
-    // La couleur reflète l'instant CONSULTÉ (momentVu), pas l'horloge réelle :
-    // sinon une résa de 21 h reste verte tant qu'il n'est pas 21 h pour de vrai,
-    // alors qu'on veut prévisualiser « à quoi ressemble la salle à ce moment ».
-    // Hors du jour en cours, l'horloge n'a de toute façon pas de sens.
-    derivedByTable[t.id] = deriveStatus(courant, momentVu, !estAujourdhui)
+    // Le SERVICE affiché (courant) suit l'instant consulté (momentVu) —
+    // c'est ce qui corrige la couleur figée sur l'horloge réelle. Mais une
+    // fois ce service choisi, le retard/l'expiration doivent rester sur
+    // l'horloge réelle (`now`) : un no-show est un fait réel, pas une
+    // propriété de l'heure qu'on prévisualise. Hors du jour en cours,
+    // l'horloge n'a de toute façon pas de sens.
+    derivedByTable[t.id] = deriveStatus(courant, now, !estAujourdhui)
   }
 
   const counts = {

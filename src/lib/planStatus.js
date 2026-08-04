@@ -8,7 +8,6 @@
 export const TABLE_DEFAULT_DURATION = 90
 
 // Fenêtres temporelles
-export const RESERVEE_LEAD_MIN = 120   // une résa devient jaune 2 h avant l'heure
 export const NO_SHOW_GRACE_MIN = 30    // puis « en retard » si personne ne s'installe
 export const OCCUPEE_GRACE_MIN = 15    // libération auto : durée + 15 min
 
@@ -16,10 +15,16 @@ export const OCCUPEE_GRACE_MIN = 15    // libération auto : durée + 15 min
  * État affiché d'une table à l'instant `now`, calculé à partir de l'intention
  * stockée (status) et des horodatages (started_at / service_at).
  *
- * Retourne { status, late?, upcoming?, expired?, at? } :
+ * Retourne { status, late?, expired?, at? } :
  *   - expired  : la ligne en base est périmée, à libérer
- *   - upcoming : réservation encore lointaine → la table est utilisable
  *   - late     : l'heure est passée, le client ne s'est pas installé
+ *
+ * `now` doit être l'horloge RÉELLE, pas l'heure consultée dans le sélecteur
+ * du plan (momentVu) : le retard et l'expiration sont des faits qui se
+ * produisent dans le temps réel, pas dans l'instant qu'on prévisualise. Le
+ * choix de QUEL service afficher pour un instant prévisualisé est déjà fait
+ * en amont par serviceAuMoment() ; deriveStatus() ne fait qu'habiller le
+ * service déjà sélectionné, jamais le re-filtrer par rapport à `now`.
  */
 /**
  * Service d'une table couvrant un instant donné.
@@ -74,9 +79,6 @@ export function deriveStatus(a, now = Date.now(), planning = false) {
   if (a.status === 'reservee') {
     if (!a.service_at) return { status: 'reservee' }        // legacy : on respecte
     const t = new Date(a.service_at).getTime()
-    if (now < t - RESERVEE_LEAD_MIN * 60000) {
-      return { status: 'libre', upcoming: true, at: a.service_at }
-    }
     if (now > t + dureeMs + (NO_SHOW_GRACE_MIN + 60) * 60000) {
       return { status: 'libre', expired: true }
     }

@@ -23,9 +23,12 @@ const cas = [
   ['occupée sans chrono (legacy)',  { status: 'occupee' },                                             'occupee'],
   ['occupée durée 120 min',         { status: 'occupee', started_at: iso(-120), duration_minutes: 120 }, 'occupee'],
 
-  // Réservée : jaune 2 h avant, « en retard » 30 min après
-  ['résa dans 5 h',                 { status: 'reservee', service_at: iso(300), duration_minutes: 90 }, 'libre+upcoming'],
-  ['résa dans 2 h 05',              { status: 'reservee', service_at: iso(125), duration_minutes: 90 }, 'libre+upcoming'],
+  // Réservée : « en retard » 30 min après l'heure. Le fait qu'une résa soit
+  // encore lointaine n'est plus géré ici : c'est serviceAuMoment() en amont
+  // qui décide si CE service est celui à afficher pour l'instant consulté.
+  // deriveStatus() habille toujours un service déjà sélectionné.
+  ['résa dans 5 h',                 { status: 'reservee', service_at: iso(300), duration_minutes: 90 }, 'reservee'],
+  ['résa dans 2 h 05',              { status: 'reservee', service_at: iso(125), duration_minutes: 90 }, 'reservee'],
   ['résa dans 1 h 55 (fenêtre)',    { status: 'reservee', service_at: iso(115), duration_minutes: 90 }, 'reservee'],
   ['résa dans 10 min',              { status: 'reservee', service_at: iso(10),  duration_minutes: 90 }, 'reservee'],
   ['résa il y a 20 min',            { status: 'reservee', service_at: iso(-20), duration_minutes: 90 }, 'reservee'],
