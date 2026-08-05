@@ -227,6 +227,7 @@ export default function Reservations() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filtre, setFiltre] = useState('toutes')
+  const [dateRecherche, setDateRecherche] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
   const [restoId, setRestoId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
@@ -367,16 +368,20 @@ export default function Reservations() {
 
   const filtered = reservations
     .filter((r) => {
+      // Une date précise prime sur l'onglet : on cherche un jour, pas une
+      // catégorie, quand le champ est rempli.
+      if (dateRecherche) return r.date === dateRecherche
       if (filtre === 'aujourd_hui') return r.date === aujourd_hui
       if (filtre === 'a_venir') return r.date >= aujourd_hui
       if (filtre === 'passees') return r.date < aujourd_hui
       return true
     })
-    // Vue "aujourd'hui"/"à venir" : la prochaine arrivée en premier, comme une
-    // fiche de service. Vue "passées" : la plus récente en premier (par défaut
-    // du tri serveur), pour retrouver rapidement ce qui vient de se passer.
+    // Vue "aujourd'hui"/"à venir"/date précise : la prochaine arrivée en
+    // premier, comme une fiche de service. Vue "passées" : la plus récente
+    // en premier (par défaut du tri serveur), pour retrouver rapidement ce
+    // qui vient de se passer.
     .sort((a, b) => {
-      if (filtre === 'passees') return 0
+      if (!dateRecherche && filtre === 'passees') return 0
       return a.date.localeCompare(b.date) || (a.heure || '').localeCompare(b.heure || '')
     })
 
@@ -469,7 +474,7 @@ export default function Reservations() {
         ) : (
         <>
         {/* Filtres */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-3 flex-wrap items-center">
           {[
             { key: 'toutes', label: 'Toutes' },
             { key: 'aujourd_hui', label: "Aujourd'hui" },
@@ -478,22 +483,52 @@ export default function Reservations() {
           ].map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setFiltre(key)}
+              onClick={() => { setFiltre(key); setDateRecherche('') }}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                filtre === key
+                filtre === key && !dateRecherche
                   ? 'bg-[#1a1a2e] text-white'
                   : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
               }`}
             >
               {label}
               <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                filtre === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                filtre === key && !dateRecherche ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
               }`}>
                 {counts[key]}
               </span>
             </button>
           ))}
+
+          {/* Rechercher un jour précis : passe devant les onglets ci-dessus */}
+          <div className="flex items-center gap-1.5 ml-1">
+            <input
+              type="date"
+              value={dateRecherche}
+              onChange={(e) => setDateRecherche(e.target.value)}
+              className={`px-3 py-2 rounded-xl text-sm border transition-colors ${
+                dateRecherche
+                  ? 'border-[#1a1a2e] text-[#1a1a2e] bg-white'
+                  : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300'
+              }`}
+            />
+            {dateRecherche && (
+              <button
+                onClick={() => setDateRecherche('')}
+                title="Effacer la recherche"
+                className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
+        <p className="text-xs text-gray-400 mb-4">
+          {dateRecherche
+            ? `${filtered.length} réservation${filtered.length > 1 ? 's' : ''} le ${formatDate(dateRecherche)}`
+            : ' '}
+        </p>
 
         {/* Contenu */}
         {loading ? (
