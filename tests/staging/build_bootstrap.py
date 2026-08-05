@@ -230,6 +230,7 @@ MIGRATIONS_APRES_DUMP = [
     '20260731_plan_par_date.sql',
     '20260803_plan_par_service.sql',
     '20260804_no_show.sql',
+    '20260805_liste_attente.sql',
 ]
 
 suite = []

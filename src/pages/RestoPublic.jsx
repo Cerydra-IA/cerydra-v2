@@ -180,6 +180,8 @@ export default function RestoPublic() {
   const [error, setError] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [fermetures, setFermetures] = useState([])
+  const [waitlistJoined, setWaitlistJoined] = useState(false)
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -287,6 +289,31 @@ export default function RestoPublic() {
     } else {
       setConfirmed(true)
     }
+  }
+
+  const handleJoinWaitlist = async () => {
+    if (!form.prenom || !form.nom || !form.email || !form.telephone) {
+      setError('Prénom, nom, email et téléphone sont nécessaires pour la liste d\'attente.')
+      return
+    }
+    setWaitlistSubmitting(true)
+    const { error: err } = await supabase.from('liste_attente').insert({
+      restaurant_id: resto.id,
+      prenom: form.prenom,
+      nom: form.nom,
+      email: form.email,
+      telephone: form.telephone,
+      date: form.date,
+      nb_personnes: Number(form.nb_personnes),
+      message: form.message || null,
+    })
+    setWaitlistSubmitting(false)
+    if (err) {
+      console.error(err)
+      setError('Une erreur est survenue. Veuillez réessayer.')
+      return
+    }
+    setWaitlistJoined(true)
   }
 
   if (loading) {
@@ -432,6 +459,30 @@ export default function RestoPublic() {
                 </select>
               )}
             </FormField>
+
+            {/* Liste d'attente : la seule option laissée au client quand la
+                journée est pleine, plutôt que de le renvoyer sans rien. */}
+            {journeeComplete && (
+              waitlistJoined ? (
+                <div className="bg-green-50 border border-green-100 text-green-700 text-sm px-4 py-3 rounded-xl">
+                  Vous êtes sur la liste d'attente pour cette date. {resto.nom} vous contactera en cas de désistement.
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                  <p className="text-xs text-amber-700 mb-2">
+                    Aucune table libre, mais vous pouvez laisser vos coordonnées : on vous appelle en cas de désistement.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={waitlistSubmitting}
+                    onClick={handleJoinWaitlist}
+                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {waitlistSubmitting ? 'Envoi…' : 'Rejoindre la liste d\'attente'}
+                  </button>
+                </div>
+              )
+            )}
 
             {/* Message */}
             <FormField label="Message" >

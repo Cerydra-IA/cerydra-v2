@@ -34,8 +34,8 @@ const EMPTY_FORM = {
 }
 
 // Modal de réservation manuelle (client au téléphone / sur place)
-function NouvelleResaModal({ restoId, onClose, onCreated }) {
-  const [form, setForm] = useState(EMPTY_FORM)
+function NouvelleResaModal({ restoId, initial, onClose, onCreated }) {
+  const [form, setForm] = useState(() => initial ? { ...EMPTY_FORM, ...initial } : EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [dispo, setDispo] = useState(null)
@@ -167,6 +167,60 @@ function NouvelleResaModal({ restoId, onClose, onCreated }) {
   )
 }
 
+// Liste d'attente : clients laissés sur le carreau par une journée complète.
+// Le restaurateur les rappelle en cas de désistement — pas de placement
+// automatique, la disponibilité change trop vite pour ça.
+function WaitlistSection({ entries, loading, updatingId, onCreerResa, onAnnuler }) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="w-7 h-7 border-2 border-[#1a1a2e] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+  if (entries.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
+        <div className="text-4xl mb-3">⏳</div>
+        <p className="text-gray-400 text-sm">Personne en liste d'attente pour l'instant.</p>
+        <p className="text-gray-300 text-xs mt-1">Elle se remplit quand un client réserve un jour complet.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {entries.map((a) => (
+        <div key={a.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="font-semibold text-[#1a1a2e] text-sm">{a.prenom} {a.nom}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {formatDate(a.date)}{a.heure ? ` · vers ${a.heure.slice(0, 5)}` : ''} · {a.nb_personnes} pers.
+            </p>
+            <p className="text-xs text-gray-400">{a.email}{a.telephone ? ` · ${a.telephone}` : ''}</p>
+            {a.message && <p className="text-xs text-gray-400 italic mt-0.5">💬 {a.message}</p>}
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={() => onCreerResa(a)}
+              disabled={updatingId === a.id}
+              className="px-3 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-40"
+            >
+              Une table s'est libérée
+            </button>
+            <button
+              onClick={() => onAnnuler(a.id)}
+              disabled={updatingId === a.id}
+              className="px-3 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium hover:bg-gray-100 hover:text-red-500 transition-colors disabled:opacity-40"
+            >
+              Retirer
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Reservations() {
   const { user } = useAuth()
   const [reservations, setReservations] = useState([])
@@ -177,6 +231,14 @@ export default function Reservations() {
   const [restoId, setRestoId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [prefillResa, setPrefillResa] = useState(null)
+
+  // Liste d'attente : vue séparée, chargée seulement quand on y va (données
+  // distinctes des réservations, pas la peine de les récupérer par défaut).
+  const [vue, setVue] = useState('reservations')
+  const [attente, setAttente] = useState([])
+  const [attenteLoading, setAttenteLoading] = useState(false)
+  const [attenteUpdatingId, setAttenteUpdatingId] = useState(null)
 
   usePushNotifications(user, restoId)
 
@@ -264,6 +326,43 @@ export default function Reservations() {
     }
   }
 
+  const fetchAttente = async () => {
+    if (!restoId) return
+    setAttenteLoading(true)
+    const { data, error: err } = await supabase
+      .from('liste_attente')
+      .select('*')
+      .eq('restaurant_id', restoId)
+      .eq('statut', 'en_attente')
+      .order('date')
+      .order('created_at')
+    if (!err) setAttente(data || [])
+    setAttenteLoading(false)
+  }
+
+  useEffect(() => {
+    if (vue === 'attente' && restoId) fetchAttente()
+  }, [vue, restoId])
+
+  const updateAttenteStatut = async (id, statut) => {
+    setAttenteUpdatingId(id)
+    const { error } = await supabase.from('liste_attente').update({ statut }).eq('id', id)
+    if (!error) setAttente((prev) => prev.filter((a) => a.id !== id))
+    setAttenteUpdatingId(null)
+  }
+
+  // Depuis une entrée d'attente, ouvre directement le formulaire de résa
+  // manuelle prérempli : évite de ressaisir nom/contact/couverts.
+  const creerResaDepuisAttente = (a) => {
+    setPrefillResa({
+      prenom: a.prenom, nom: a.nom, telephone: a.telephone || '', email: a.email || '',
+      date: a.date, heure: a.heure ? a.heure.slice(0, 5) : '', nb_personnes: a.nb_personnes,
+      message: a.message || '',
+      _attenteId: a.id,
+    })
+    setShowNewModal(true)
+  }
+
   const aujourd_hui = new Date().toISOString().split('T')[0]
 
   const filtered = reservations
@@ -295,14 +394,19 @@ export default function Reservations() {
       {showNewModal && (
         <NouvelleResaModal
           restoId={restoId}
-          onClose={() => setShowNewModal(false)}
-          onCreated={fetchReservations}
+          initial={prefillResa}
+          onClose={() => { setShowNewModal(false); setPrefillResa(null) }}
+          onCreated={() => {
+            fetchReservations()
+            if (prefillResa?._attenteId) updateAttenteStatut(prefillResa._attenteId, 'placee')
+            setPrefillResa(null)
+          }}
         />
       )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           <h1 className="text-xl font-bold text-[#1a1a2e]">Réservations</h1>
           <div className="flex items-center gap-3">
             <button
@@ -339,6 +443,31 @@ export default function Reservations() {
           </div>
         </div>
 
+        {/* Vue : réservations confirmées vs liste d'attente (données distinctes) */}
+        <div className="flex gap-1 mb-5 bg-white border border-gray-100 rounded-2xl p-1 w-fit">
+          {[['reservations', 'Réservations'], ['attente', "Liste d'attente"]].map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setVue(v)}
+              className={`px-5 py-2 rounded-xl text-sm font-medium transition-colors ${
+                vue === v ? 'bg-[#1a1a2e] text-white' : 'text-gray-500 hover:text-[#1a1a2e]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {vue === 'attente' ? (
+          <WaitlistSection
+            entries={attente}
+            loading={attenteLoading}
+            updatingId={attenteUpdatingId}
+            onCreerResa={creerResaDepuisAttente}
+            onAnnuler={(id) => updateAttenteStatut(id, 'annulee')}
+          />
+        ) : (
+        <>
         {/* Filtres */}
         <div className="flex gap-2 mb-6">
           {[
@@ -562,6 +691,8 @@ export default function Reservations() {
               ))}
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>
