@@ -25,6 +25,7 @@ const RESTO_DEFAUT = {
   description: '',
   nb_tables: '',
   nb_couverts_max: '',
+  nb_couverts_max_manuel: true,
   delai_minimum_heures: 2,
   duree_occupation_minutes: 90,
   message_confirmation: 'Merci pour votre réservation ! Nous avons hâte de vous accueillir.',
@@ -148,6 +149,7 @@ export default function Dashboard() {
           description: restoData.description || '',
           nb_tables: restoData.nb_tables || '',
           nb_couverts_max: restoData.nb_couverts_max || '',
+          nb_couverts_max_manuel: restoData.nb_couverts_max_manuel ?? true,
           delai_minimum_heures: restoData.delai_minimum_heures ?? 2,
           duree_occupation_minutes: restoData.duree_occupation_minutes ?? 90,
           message_confirmation: restoData.message_confirmation || '',
@@ -377,15 +379,36 @@ export default function Dashboard() {
                 />
               </Field>
 
-              <Field label="Couverts max / table">
+              <Field label="Personnes max / réservation en ligne">
                 <input
                   type="number"
                   min="1"
-                  className={inputCls}
+                  disabled={!resto.nb_couverts_max_manuel}
+                  className={`${inputCls} ${!resto.nb_couverts_max_manuel ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
                   value={resto.nb_couverts_max}
                   onChange={(e) => setResto({ ...resto, nb_couverts_max: e.target.value })}
                   placeholder="6"
                 />
+                <label className="flex items-center gap-2 mt-2 text-xs text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!resto.nb_couverts_max_manuel}
+                    onChange={async (e) => {
+                      const auto = e.target.checked
+                      if (auto && restoId) {
+                        // Recalcul immédiat : sinon la valeur reste celle
+                        // d'avant jusqu'au prochain changement de table.
+                        const { data } = await supabase
+                          .from('plan_tables').select('capacity').eq('restaurant_id', restoId)
+                        const total = (data || []).reduce((s, t) => s + (t.capacity || 0), 0)
+                        setResto((r) => ({ ...r, nb_couverts_max_manuel: false, nb_couverts_max: Math.max(total, 1) }))
+                      } else {
+                        setResto((r) => ({ ...r, nb_couverts_max_manuel: !auto }))
+                      }
+                    }}
+                  />
+                  Calculer automatiquement depuis mon plan de salle
+                </label>
               </Field>
 
               <Field label="Délai minimum">
