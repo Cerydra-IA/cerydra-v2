@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { monRestaurantId } from '../lib/restaurant'
 import Navbar from '../components/dashboard/Navbar'
 import {
   LineChart, Line, BarChart, Bar,
@@ -60,13 +61,9 @@ export default function Statistiques() {
   async function fetchStats() {
     setLoading(true)
 
-    const { data: resto } = await supabase
-      .from('restaurants')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!resto) { setLoading(false); return }
+    const restoId = await monRestaurantId()
+    if (!restoId) { setLoading(false); return }
+    const resto = { id: restoId }
 
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]

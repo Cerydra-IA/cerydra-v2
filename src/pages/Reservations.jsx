@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { monRestaurantId } from '../lib/restaurant'
 import Navbar from '../components/dashboard/Navbar'
 import SectionCard from '../components/dashboard/SectionCard'
 import { usePushNotifications } from '../hooks/usePushNotifications'
@@ -270,18 +271,14 @@ export default function Reservations() {
     setLoading(true)
     setError('')
 
-    // 1. Récupère le restaurant de l'utilisateur
-    const { data: resto, error: restoErr } = await supabase
-      .from('restaurants')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (restoErr || !resto) {
+    // 1. Récupère le restaurant du compte connecté (propriétaire ou membre)
+    const restoId0 = await monRestaurantId()
+    if (!restoId0) {
       setError('Configurez d\'abord votre restaurant pour voir les réservations.')
       setLoading(false)
       return
     }
+    const resto = { id: restoId0 }
     setRestoId(resto.id)
 
     // 2. Récupère les réservations

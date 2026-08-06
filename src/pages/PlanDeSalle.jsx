@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { monRestaurantId } from '../lib/restaurant'
 import Navbar from '../components/dashboard/Navbar'
 import { deriveStatus, serviceAuMoment, nombreServices, TABLE_DEFAULT_DURATION } from '../lib/planStatus'
 
@@ -600,9 +601,9 @@ export default function PlanDeSalle() {
 
   const loadAll = async () => {
     setLoading(true)
-    const { data: resto } = await supabase
-      .from('restaurants').select('id').eq('user_id', user.id).single()
-    if (!resto) { setLoading(false); return }
+    const restoId0 = await monRestaurantId()
+    if (!restoId0) { setLoading(false); return }
+    const resto = { id: restoId0 }
     setRestoId(resto.id)
 
     const [{ data: tablesData }, { data: assignData }, { data: horairesData }, { data: resaData }] = await Promise.all([

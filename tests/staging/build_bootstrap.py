@@ -232,6 +232,7 @@ MIGRATIONS_APRES_DUMP = [
     '20260804_no_show.sql',
     '20260805_liste_attente.sql',
     '20260806_capacite_auto.sql',
+    '20260807_multi_utilisateurs.sql',
 ]
 
 suite = []

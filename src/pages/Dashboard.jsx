@@ -98,6 +98,14 @@ export default function Dashboard() {
   const [uploadingBg, setUploadingBg] = useState(false)
   const [slugManuel, setSlugManuel] = useState(false)
   const [toast, setToast] = useState({ message: '', type: 'success' })
+  // Un membre invité (voir Équipe) peut consulter le dashboard opérationnel
+  // mais pas modifier la Configuration — sinon un save échoue silencieusement
+  // (RLS) ou, pire, crée un second restaurant s'il n'en trouve aucun à lui.
+  const [estMembre, setEstMembre] = useState(false)
+  const [restoNomMembre, setRestoNomMembre] = useState('')
+  const [membres, setMembres] = useState([])
+  const [nouvelEmailMembre, setNouvelEmailMembre] = useState('')
+  const [ajoutMembreEnCours, setAjoutMembreEnCours] = useState(false)
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -192,11 +200,50 @@ export default function Dashboard() {
           })
           setHoraires(merged)
         }
+
+        // Membres avec accès (visible seulement par le propriétaire)
+        const { data: membresData } = await supabase.rpc('lister_membres', { p_restaurant_id: restoData.id })
+        setMembres(membresData || [])
+      } else {
+        // Pas propriétaire : peut-être un membre invité sur un autre restaurant.
+        const { data: restoIdMembre } = await supabase.rpc('mon_restaurant_id')
+        if (restoIdMembre) {
+          const { data: r } = await supabase.from('restaurants').select('nom').eq('id', restoIdMembre).single()
+          setEstMembre(true)
+          setRestoNomMembre(r?.nom || '')
+        }
       }
       setLoading(false)
     }
     load()
   }, [user])
+
+  const ajouterMembre = async (e) => {
+    e.preventDefault()
+    if (!nouvelEmailMembre.trim() || !restoId) return
+    setAjoutMembreEnCours(true)
+    const { error } = await supabase.rpc('ajouter_membre_par_email', {
+      p_restaurant_id: restoId, p_email: nouvelEmailMembre.trim(),
+    })
+    setAjoutMembreEnCours(false)
+    if (error) {
+      const msg = error.message.includes('utilisateur_introuvable')
+        ? 'Aucun compte Cerydra avec cet email. Créez-lui un compte (Supabase → Authentication) avant de l\'ajouter ici.'
+        : 'Erreur : ' + error.message
+      showToast(msg, 'error')
+      return
+    }
+    const { data: membresData } = await supabase.rpc('lister_membres', { p_restaurant_id: restoId })
+    setMembres(membresData || [])
+    setNouvelEmailMembre('')
+    showToast('Accès accordé.')
+  }
+
+  const retirerMembre = async (userId) => {
+    const { error } = await supabase.from('restaurant_members').delete()
+      .eq('restaurant_id', restoId).eq('user_id', userId)
+    if (!error) setMembres((m) => m.filter((x) => x.user_id !== userId))
+  }
 
   // Génère le slug automatiquement depuis le nom
   const handleNomChange = (val) => {
@@ -267,6 +314,23 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#1a1a2e] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (estMembre) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-xl mx-auto px-4 sm:px-6 py-16 text-center">
+          <p className="text-gray-500 text-sm">
+            Vous avez accès à <strong>{restoNomMembre}</strong> en tant que membre de l'équipe.
+          </p>
+          <p className="text-gray-400 text-xs mt-2">
+            Seul le propriétaire du compte peut modifier la Configuration. Les onglets Réservations,
+            Plan de salle et Statistiques restent accessibles.
+          </p>
+        </div>
       </div>
     )
   }
@@ -747,6 +811,55 @@ export default function Dashboard() {
             </button>
           </div>
         </form>
+
+        {/* Équipe — hors du formulaire de config : indépendant du bouton Sauvegarder */}
+        {restoId && (
+          <div className="mt-6">
+            <SectionCard title="Équipe" description="Donnez accès au dashboard à un collègue (ex : pour faire une démo), sans partager votre mot de passe.">
+              <div className="space-y-3">
+                {membres.length === 0 ? (
+                  <p className="text-xs text-gray-400">Personne d'autre n'a accès pour l'instant.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {membres.map((m) => (
+                      <div key={m.user_id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 text-sm">
+                        <span className="text-[#1a1a2e]">{m.email}</span>
+                        <button
+                          type="button"
+                          onClick={() => retirerMembre(m.user_id)}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <form onSubmit={ajouterMembre} className="flex gap-2 pt-1">
+                  <input
+                    type="email"
+                    placeholder="email@exemple.fr"
+                    value={nouvelEmailMembre}
+                    onChange={(e) => setNouvelEmailMembre(e.target.value)}
+                    className={inputCls}
+                  />
+                  <button
+                    type="submit"
+                    disabled={ajoutMembreEnCours}
+                    className="px-4 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {ajoutMembreEnCours ? 'Ajout…' : 'Ajouter'}
+                  </button>
+                </form>
+                <p className="text-[11px] text-gray-400">
+                  La personne doit déjà avoir un compte Cerydra (créé depuis Supabase → Authentication) —
+                  cela ne crée pas de compte, ça donne juste accès à celui qui existe.
+                </p>
+              </div>
+            </SectionCard>
+          </div>
+        )}
       </div>
 
       <Toast message={toast.message} type={toast.type} />
