@@ -234,6 +234,7 @@ MIGRATIONS_APRES_DUMP = [
     '20260806_capacite_auto.sql',
     '20260807_multi_utilisateurs.sql',
     '20260808_role_manager.sql',
+    '20260809_retrait_membre_propre.sql',
 ]
 
 suite = []

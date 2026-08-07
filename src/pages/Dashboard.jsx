@@ -260,8 +260,10 @@ export default function Dashboard() {
   }
 
   const retirerMembre = async (userId) => {
-    const { error } = await supabase.from('restaurant_members').delete()
-      .eq('restaurant_id', restoId).eq('user_id', userId)
+    // Passe par une RPC : supprime aussi les notifications push du membre pour
+    // ce restaurant, que la RLS ne laisserait pas le propriétaire toucher
+    // directement (chacun ne gère que ses propres abonnements).
+    const { error } = await supabase.rpc('retirer_membre', { p_restaurant_id: restoId, p_user_id: userId })
     if (!error) setMembres((m) => m.filter((x) => x.user_id !== userId))
   }
 
