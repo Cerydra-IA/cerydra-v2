@@ -105,7 +105,11 @@ export default function Dashboard() {
   const [restoNomMembre, setRestoNomMembre] = useState('')
   const [membres, setMembres] = useState([])
   const [nouvelEmailMembre, setNouvelEmailMembre] = useState('')
+  const [nouveauRoleMembre, setNouveauRoleMembre] = useState('membre')
   const [ajoutMembreEnCours, setAjoutMembreEnCours] = useState(false)
+  // Un manager modifie la config mais ne gère pas qui a accès — ça reste
+  // le seul pouvoir réservé au vrai propriétaire.
+  const [peutGererEquipe, setPeutGererEquipe] = useState(false)
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -141,11 +145,31 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return
     const load = async () => {
-      const { data: restoData } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      // Propriétaire d'abord ; sinon on regarde si le compte est membre
+      // (rôle "manager" = accès complet à la Configuration, "membre" = lecture
+      // seule sur le reste du dashboard uniquement).
+      let restoData = null
+      let estProprietaire = false
+      const { data: proprio } = await supabase
+        .from('restaurants').select('*').eq('user_id', user.id).single()
+
+      if (proprio) {
+        restoData = proprio
+        estProprietaire = true
+      } else {
+        const { data: restoIdMembre } = await supabase.rpc('mon_restaurant_id')
+        if (restoIdMembre) {
+          const { data: role } = await supabase.rpc('mon_role', { p_restaurant_id: restoIdMembre })
+          if (role === 'manager') {
+            const { data: r } = await supabase.from('restaurants').select('*').eq('id', restoIdMembre).single()
+            restoData = r
+          } else {
+            const { data: r } = await supabase.from('restaurants').select('nom').eq('id', restoIdMembre).single()
+            setEstMembre(true)
+            setRestoNomMembre(r?.nom || '')
+          }
+        }
+      }
 
       if (restoData) {
         setRestoId(restoData.id)
@@ -201,16 +225,12 @@ export default function Dashboard() {
           setHoraires(merged)
         }
 
-        // Membres avec accès (visible seulement par le propriétaire)
-        const { data: membresData } = await supabase.rpc('lister_membres', { p_restaurant_id: restoData.id })
-        setMembres(membresData || [])
-      } else {
-        // Pas propriétaire : peut-être un membre invité sur un autre restaurant.
-        const { data: restoIdMembre } = await supabase.rpc('mon_restaurant_id')
-        if (restoIdMembre) {
-          const { data: r } = await supabase.from('restaurants').select('nom').eq('id', restoIdMembre).single()
-          setEstMembre(true)
-          setRestoNomMembre(r?.nom || '')
+        setPeutGererEquipe(estProprietaire)
+        // Membres avec accès (visible et gérable par le propriétaire uniquement —
+        // un manager peut modifier la config, pas donner l'accès à d'autres).
+        if (estProprietaire) {
+          const { data: membresData } = await supabase.rpc('lister_membres', { p_restaurant_id: restoData.id })
+          setMembres(membresData || [])
         }
       }
       setLoading(false)
@@ -223,7 +243,7 @@ export default function Dashboard() {
     if (!nouvelEmailMembre.trim() || !restoId) return
     setAjoutMembreEnCours(true)
     const { error } = await supabase.rpc('ajouter_membre_par_email', {
-      p_restaurant_id: restoId, p_email: nouvelEmailMembre.trim(),
+      p_restaurant_id: restoId, p_email: nouvelEmailMembre.trim(), p_role: nouveauRoleMembre,
     })
     setAjoutMembreEnCours(false)
     if (error) {
@@ -274,9 +294,12 @@ export default function Dashboard() {
 
       // Upsert restaurant
       if (restoId) {
+        // Jamais de user_id ici : un manager (non-propriétaire) qui sauvegarde
+        // ne doit modifier que les réglages, pas transférer la propriété du
+        // restaurant vers son propre compte.
         const { error } = await supabase
           .from('restaurants')
-          .update({ ...resto, user_id: user.id })
+          .update({ ...resto })
           .eq('id', restoId)
         if (error) throw error
       } else {
@@ -812,8 +835,10 @@ export default function Dashboard() {
           </div>
         </form>
 
-        {/* Équipe — hors du formulaire de config : indépendant du bouton Sauvegarder */}
-        {restoId && (
+        {/* Équipe — hors du formulaire de config : indépendant du bouton Sauvegarder.
+            Réservé au propriétaire : un manager peut modifier la config, pas
+            décider qui a accès. */}
+        {restoId && peutGererEquipe && (
           <div className="mt-6">
             <SectionCard title="Équipe" description="Donnez accès au dashboard à un collègue (ex : pour faire une démo), sans partager votre mot de passe.">
               <div className="space-y-3">
@@ -823,7 +848,14 @@ export default function Dashboard() {
                   <div className="space-y-2">
                     {membres.map((m) => (
                       <div key={m.user_id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 text-sm">
-                        <span className="text-[#1a1a2e]">{m.email}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#1a1a2e]">{m.email}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            m.role === 'manager' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {m.role === 'manager' ? 'Manager' : 'Lecture seule'}
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => retirerMembre(m.user_id)}
@@ -836,21 +868,36 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <form onSubmit={ajouterMembre} className="flex gap-2 pt-1">
-                  <input
-                    type="email"
-                    placeholder="email@exemple.fr"
-                    value={nouvelEmailMembre}
-                    onChange={(e) => setNouvelEmailMembre(e.target.value)}
-                    className={inputCls}
-                  />
-                  <button
-                    type="submit"
-                    disabled={ajoutMembreEnCours}
-                    className="px-4 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {ajoutMembreEnCours ? 'Ajout…' : 'Ajouter'}
-                  </button>
+                <form onSubmit={ajouterMembre} className="space-y-2 pt-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder="email@exemple.fr"
+                      value={nouvelEmailMembre}
+                      onChange={(e) => setNouvelEmailMembre(e.target.value)}
+                      className={inputCls}
+                    />
+                    <button
+                      type="submit"
+                      disabled={ajoutMembreEnCours}
+                      className="px-4 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {ajoutMembreEnCours ? 'Ajout…' : 'Ajouter'}
+                    </button>
+                  </div>
+                  <div className="flex gap-4">
+                    {[['membre', 'Lecture seule — voit le dashboard, pas la Configuration'], ['manager', 'Manager — accès complet, y compris Configuration']].map(([v, label]) => (
+                      <label key={v} className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="role-membre"
+                          checked={nouveauRoleMembre === v}
+                          onChange={() => setNouveauRoleMembre(v)}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
                 </form>
                 <p className="text-[11px] text-gray-400">
                   La personne doit déjà avoir un compte Cerydra (créé depuis Supabase → Authentication) —
