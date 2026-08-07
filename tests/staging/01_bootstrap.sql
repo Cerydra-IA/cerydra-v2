@@ -2292,6 +2292,10 @@ CREATE POLICY "Suppression horaires de son restaurant" ON horaires
   FOR DELETE USING (peut_gerer_restaurant(restaurant_id));
 
 -- Rôle renvoyé par ajouter_membre_par_email() et lister_membres()
+-- DROP d'abord : on ajoute un paramètre, CREATE OR REPLACE seul créerait une
+-- surcharge (deux fonctions du même nom) au lieu de remplacer l'existante,
+-- ce qui rendrait un appel à 2 arguments ambigu.
+DROP FUNCTION IF EXISTS ajouter_membre_par_email(uuid, text);
 CREATE OR REPLACE FUNCTION ajouter_membre_par_email(p_restaurant_id uuid, p_email text, p_role text DEFAULT 'membre')
 RETURNS text AS $$
 DECLARE
@@ -2322,6 +2326,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION ajouter_membre_par_email(uuid, text, text) TO authenticated;
 
+-- DROP d'abord : le type de retour change (ajout de `role`), Postgres
+-- refuse un CREATE OR REPLACE qui modifierait la forme des colonnes.
+DROP FUNCTION IF EXISTS lister_membres(uuid);
 CREATE OR REPLACE FUNCTION lister_membres(p_restaurant_id uuid)
 RETURNS TABLE(user_id uuid, email text, role text, created_at timestamptz) AS $$
   SELECT m.user_id, u.email, m.role, m.created_at
