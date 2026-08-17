@@ -768,6 +768,8 @@ export default function Dashboard() {
                           if (!upErr) {
                             const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
                             setResto((r) => ({ ...r, widget_bg_image_url: data.publicUrl }))
+                          } else {
+                            showToast('Erreur envoi : ' + upErr.message, 'error')
                           }
                           setUploadingBg(false)
                         }}
@@ -878,6 +880,8 @@ export default function Dashboard() {
                           if (!upErr) {
                             const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
                             setResto((r) => ({ ...r, photos: [...r.photos, data.publicUrl] }))
+                          } else {
+                            showToast('Erreur envoi photo : ' + upErr.message, 'error')
                           }
                           setUploadingPhoto(false)
                         }}
@@ -913,6 +917,8 @@ export default function Dashboard() {
                         if (!upErr) {
                           const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
                           setResto((r) => ({ ...r, menu_url: data.publicUrl }))
+                        } else {
+                          showToast('Erreur envoi menu : ' + upErr.message, 'error')
                         }
                         setUploadingMenu(false)
                       }}
