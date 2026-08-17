@@ -236,6 +236,7 @@ MIGRATIONS_APRES_DUMP = [
     '20260808_role_manager.sql',
     '20260809_retrait_membre_propre.sql',
     '20260810_photos_menu.sql',
+    '20260811_storage_widget_images.sql',
 ]
 
 suite = []
