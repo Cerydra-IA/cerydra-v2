@@ -33,6 +33,8 @@ const RESTO_DEFAUT = {
   widget_bg_color: '#ffffff',
   widget_button_text: 'Réserver',
   widget_bg_image_url: '',
+  photos: [],
+  menu_url: '',
 }
 
 function Toast({ message, type }) {
@@ -96,6 +98,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingBg, setUploadingBg] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [uploadingMenu, setUploadingMenu] = useState(false)
   const [slugManuel, setSlugManuel] = useState(false)
   const [toast, setToast] = useState({ message: '', type: 'success' })
   // Un membre invité (voir Équipe) peut consulter le dashboard opérationnel
@@ -189,6 +193,8 @@ export default function Dashboard() {
           widget_bg_color: restoData.widget_bg_color || '#ffffff',
           widget_button_text: restoData.widget_button_text || 'Confirmer la réservation',
           widget_bg_image_url: restoData.widget_bg_image_url || '',
+          photos: restoData.photos || [],
+          menu_url: restoData.menu_url || '',
         })
         if (restoData.slug) setSlugManuel(true)
 
@@ -820,6 +826,112 @@ export default function Dashboard() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Photos & menu */}
+          <SectionCard
+            title="Photos & menu"
+            description="Ce que voit un client avant de réserver — donne envie autant que ça informe."
+          >
+            <div className="space-y-6">
+              <div>
+                <label className="block text-xs font-medium text-[#1a1a2e] mb-2">
+                  Photos du restaurant (salle, plats...)
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {resto.photos.map((url, i) => (
+                    <div key={url} className="relative w-20 h-20">
+                      <img src={url} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setResto((r) => ({ ...r, photos: r.photos.filter((_, j) => j !== i) }))}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-red-500 flex items-center justify-center text-xs shadow-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {resto.photos.length < 6 && (
+                    <label className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-[#1a1a2e] transition-colors text-gray-300 hover:text-[#1a1a2e]">
+                      {uploadingPhoto ? (
+                        <span className="text-[10px]">Envoi…</span>
+                      ) : (
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingPhoto || !restoId}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file || !restoId) return
+                          setUploadingPhoto(true)
+                          const ext = file.name.split('.').pop()
+                          const path = `galerie/${restoId}-${Date.now()}.${ext}`
+                          const { error: upErr } = await supabase.storage.from('widget-images').upload(path, file)
+                          if (!upErr) {
+                            const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
+                            setResto((r) => ({ ...r, photos: [...r.photos, data.publicUrl] }))
+                          }
+                          setUploadingPhoto(false)
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {restoId ? '6 photos maximum. La première sert de photo principale.' : 'Enregistrez d\'abord la configuration pour activer l\'envoi de photos.'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#1a1a2e] mb-2">Menu (PDF ou image)</label>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-[#1a1a2e] hover:text-[#1a1a2e] transition-colors">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    {uploadingMenu ? 'Envoi…' : resto.menu_url ? 'Remplacer le menu' : 'Ajouter le menu'}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      disabled={uploadingMenu || !restoId}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file || !restoId) return
+                        setUploadingMenu(true)
+                        const ext = file.name.split('.').pop()
+                        const path = `menu/${restoId}.${ext}`
+                        const { error: upErr } = await supabase.storage.from('widget-images').upload(path, file, { upsert: true })
+                        if (!upErr) {
+                          const { data } = supabase.storage.from('widget-images').getPublicUrl(path)
+                          setResto((r) => ({ ...r, menu_url: data.publicUrl }))
+                        }
+                        setUploadingMenu(false)
+                      }}
+                    />
+                  </label>
+                  {resto.menu_url && (
+                    <div className="flex items-center gap-2">
+                      <a href={resto.menu_url} target="_blank" rel="noreferrer" className="text-xs text-[#2563EB] hover:underline">
+                        Voir le fichier actuel
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setResto((r) => ({ ...r, menu_url: '' }))}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

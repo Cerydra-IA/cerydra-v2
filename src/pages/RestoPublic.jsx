@@ -349,6 +349,25 @@ export default function RestoPublic() {
       )}
 
       <div className={isWidget ? 'p-4' : 'flex-1 max-w-lg mx-auto w-full px-6 py-10'}>
+        {/* Photo principale — masquée en mode widget : le site du restaurant
+            montre déjà ses propres photos autour du widget. */}
+        {!isWidget && resto.photos?.length > 0 && (
+          <div className="mb-6 -mx-6 sm:mx-0">
+            <img
+              src={resto.photos[0]}
+              alt={resto.nom}
+              className="w-full h-56 sm:h-64 sm:rounded-2xl object-cover"
+            />
+            {resto.photos.length > 1 && (
+              <div className="flex gap-2 mt-2 px-6 sm:px-0 overflow-x-auto pb-1">
+                {resto.photos.slice(1).map((url) => (
+                  <img key={url} src={url} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-gray-100" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Infos restaurant — masquées en mode widget */}
         {!isWidget && (
           <div className="mb-8">
@@ -376,6 +395,19 @@ export default function RestoPublic() {
                   </span>
                 )}
               </div>
+            )}
+            {resto.menu_url && (
+              <a
+                href={resto.menu_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-[#2563EB] hover:underline"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Voir le menu
+              </a>
             )}
           </div>
         )}
