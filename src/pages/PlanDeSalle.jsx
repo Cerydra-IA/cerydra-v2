@@ -46,6 +46,83 @@ function Toast({ message, type }) {
   )
 }
 
+// ─── Guide de prise en main ─────────────────────────────────────────────────
+// Affiché seul à la première visite (clé localStorage), rouvrable via le
+// bouton « ? » — utile en démo commerciale pour expliquer les deux concepts
+// les moins évidents : le sélecteur d'heure et la pastille multi-service.
+
+const ETAPES_GUIDE = [
+  {
+    titre: 'La salle, à l\'instant que vous choisissez',
+    texte: 'Le plan n\'affiche pas juste "maintenant" : le sélecteur d\'heure en haut ' +
+      'vous montre la salle à n\'importe quel moment de la journée. Pratique pour préparer ' +
+      'le service du soir dès le matin, sans attendre l\'heure réelle.',
+  },
+  {
+    titre: 'Une table peut avoir plusieurs services',
+    texte: 'La pastille "×2" sur une table veut dire qu\'elle reçoit deux tournées dans la ' +
+      'journée (ex : 19h puis 21h). Naviguez avec le sélecteur d\'heure pour voir qui est ' +
+      'installé à quel moment.',
+  },
+  {
+    titre: 'Placer une réservation en attente',
+    texte: 'Le bandeau orange en haut liste les réservations pas encore placées. Cliquez ' +
+      'dessus, puis tapez la table de destination sur le plan : elle s\'y assigne directement.',
+  },
+  {
+    titre: 'Toucher une table',
+    texte: 'Un tap ouvre sa fiche : changer le statut, assigner un client sans réservation, ' +
+      'ou marquer no-show si personne ne s\'installe après 30 minutes. Le crayon et la ' +
+      'corbeille modifient ou libèrent un service déjà en place.',
+  },
+]
+
+function GuidePlan({ onClose }) {
+  const [etape, setEtape] = useState(0)
+  const derniere = etape === ETAPES_GUIDE.length - 1
+  const e = ETAPES_GUIDE[etape]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative w-full sm:max-w-sm bg-white sm:rounded-2xl rounded-t-3xl shadow-xl overflow-hidden p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex gap-1.5 mb-5">
+          {ETAPES_GUIDE.map((_, i) => (
+            <div key={i} className={`h-1 flex-1 rounded-full ${i <= etape ? 'bg-[#1a1a2e]' : 'bg-gray-100'}`} />
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mb-1">Étape {etape + 1} / {ETAPES_GUIDE.length}</p>
+        <h2 className="text-lg font-bold text-[#1a1a2e] mb-3">{e.titre}</h2>
+        <p className="text-sm text-gray-500 leading-relaxed mb-6">{e.texte}</p>
+        <div className="flex gap-2">
+          {etape > 0 && (
+            <button
+              onClick={() => setEtape((n) => n - 1)}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              Précédent
+            </button>
+          )}
+          <button
+            onClick={() => (derniere ? onClose() : setEtape((n) => n + 1))}
+            className="flex-1 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#2a2a4e] transition-colors"
+          >
+            {derniere ? 'Compris !' : 'Suivant'}
+          </button>
+        </div>
+        {!derniere && (
+          <button onClick={onClose} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-3 transition-colors">
+            Passer
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── TableShape ───────────────────────────────────────────────────────────────
 
 function TableShape({ table, assignment, derived, nbServices = 0, selected, onTap, onDragStart, configMode }) {
@@ -573,6 +650,16 @@ export default function PlanDeSalle() {
   const [configMode, setConfigMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState({ message: '', type: 'success' })
+  // Guide de prise en main : auto à la première visite, rouvrable à volonté
+  // (bouton « ? »), notamment pour une démo commerciale.
+  const [showGuide, setShowGuide] = useState(false)
+  useEffect(() => {
+    if (!localStorage.getItem('cerydra_guide_plan_vu')) setShowGuide(true)
+  }, [])
+  const fermerGuide = () => {
+    localStorage.setItem('cerydra_guide_plan_vu', '1')
+    setShowGuide(false)
+  }
 
   // Sélection en cours dans le bandeau (réservation à placer)
   const [resaEnCours, setResaEnCours] = useState(null)
@@ -1216,6 +1303,13 @@ export default function PlanDeSalle() {
               </svg>
               Actualiser
             </button>
+            <button
+              onClick={() => setShowGuide(true)}
+              title="Comment ça marche ?"
+              className="w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold text-gray-400 hover:text-[#1a1a2e] bg-white border border-gray-200 hover:border-gray-300 transition-colors"
+            >
+              ?
+            </button>
           </div>
         </div>
 
@@ -1446,6 +1540,8 @@ export default function PlanDeSalle() {
           onDelete={handleEditDelete}
         />
       )}
+
+      {showGuide && <GuidePlan onClose={fermerGuide} />}
 
       <Toast message={toast.message} type={toast.type} />
     </div>
