@@ -31,7 +31,11 @@ const src = `/* CERYDRA Widget — aucune clé sensible dans ce fichier.
 
   var JOURS={0:'dimanche',1:'lundi',2:'mardi',3:'mercredi',4:'jeudi',5:'vendredi',6:'samedi'};
   function toMin(t){var p=t.split(':');return +p[0]*60+ +p[1];}
-  function slots(a,b){var o=[],c=toMin(a),e=toMin(b);while(c<e){o.push(('0'+Math.floor(c/60)).slice(-2)+':'+('0'+(c%60)).slice(-2));c+=30;}return o;}
+  // Dernière arrivée 1h avant la fermeture — même règle que RestoPublic.jsx
+  // et le trigger validate_reservation (sans ça, un horaire refusé côté
+  // serveur reste quand même proposé ici, un client tombe sur une erreur
+  // au lieu de ne jamais voir ce créneau).
+  function slots(a,b){var o=[],c=toMin(a),e=toMin(b)-60;while(c<=e){o.push(('0'+Math.floor(c/60)).slice(-2)+':'+('0'+(c%60)).slice(-2));c+=30;}return o;}
   function slotsForDate(hs,d){
     if(!d||!hs.length)return[];
     var j=JOURS[new Date(d).getDay()],h=hs.filter(function(x){return x.jour===j;})[0];
