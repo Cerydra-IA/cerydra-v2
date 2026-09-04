@@ -134,7 +134,10 @@ export default async function handler(req) {
       if (!restos || restos.length === 0) {
         return new Response(JSON.stringify({ error: 'Restaurant introuvable' }), { status: 404, headers })
       }
-      await sbPost('reservations', { ...body, restaurant_id: restos[0].id, statut: 'en_attente' })
+      // Cohérent avec la page directe (RestoPublic.jsx) : confirmation immédiate,
+      // pas d'attente manuelle du restaurateur. Le trigger validate_reservation
+      // a déjà vérifié disponibilité/horaires/anti-doublon avant l'insertion.
+      await sbPost('reservations', { ...body, restaurant_id: restos[0].id, statut: 'confirmée' })
       return new Response(JSON.stringify({ ok: true }), { status: 201, headers })
     }
 
