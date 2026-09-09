@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Reservations from './pages/Reservations'
 import Statistiques from './pages/Statistiques'
 import PlanDeSalle from './pages/PlanDeSalle'
+import Clients from './pages/Clients'
 import RestoPublic from './pages/RestoPublic'
 import Annuler from './pages/Annuler'
 import Admin from './pages/Admin'
@@ -54,6 +55,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PlanDeSalle />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/clients"
+            element={
+              <ProtectedRoute>
+                <Clients />
               </ProtectedRoute>
             }
           />

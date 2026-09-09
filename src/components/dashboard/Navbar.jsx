@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard/statistiques', label: 'Statistiques' },
   { to: '/dashboard/reservations', label: 'Réservations' },
   { to: '/dashboard/plan', label: 'Plan de salle' },
+  { to: '/dashboard/clients', label: 'Clients' },
 ]
 
 export default function Navbar() {
